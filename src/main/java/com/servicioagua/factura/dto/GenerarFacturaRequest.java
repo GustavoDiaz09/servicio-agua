@@ -14,15 +14,15 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class GenerarFacturaRequest {
 
-    @NotNull(message = "el cliente es obligatorio")
+    @NotNull(message = "El cliente es obligatorio")
     private Long clienteId;
 
-    @NotNull(message = "el período desde es obligatorio")
+    @NotNull(message = "El período desde es obligatorio")
     private LocalDate periodoDesde;
 
-    @NotNull(message = "el período hasta es obligatorio")
+    @NotNull(message = "El período hasta es obligatorio")
     private LocalDate periodoHasta;
 
-    @NotNull(message = "el vencimiento es obligatorio")
+    @NotNull(message = "El vencimiento es obligatorio")
     private LocalDate vencimiento;
 }

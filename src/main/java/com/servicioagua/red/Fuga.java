@@ -38,10 +38,12 @@ public class Fuga {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
+    @Builder.Default
     private EstadoFuga estado = EstadoFuga.REPORTADA;
 
     @NotNull
     @Column(name = "fecha_reporte", nullable = false)
+    @Builder.Default
     private LocalDate fechaReporte = LocalDate.now();
 
     @Column(name = "fecha_resolucion")

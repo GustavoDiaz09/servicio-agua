@@ -35,9 +35,11 @@ public class Medidor {
     private Integer lecturaAnteriorAjuste;
 
     @Column(nullable = false)
+    @Builder.Default
     private LocalDate fechaInstalacion = LocalDate.now();
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
+    @Builder.Default
     private EstadoMedidor estado = EstadoMedidor.ACTIVO;
 }

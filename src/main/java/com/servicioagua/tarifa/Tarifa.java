@@ -44,6 +44,7 @@ public class Tarifa {
 
     @DecimalMin("0.00")
     @Column(name = "cargo_fijo", precision = 10, scale = 2)
+    @Builder.Default
     private BigDecimal cargoFijo = BigDecimal.ZERO;
 
     @NotNull

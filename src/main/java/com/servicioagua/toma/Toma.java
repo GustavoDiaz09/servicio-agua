@@ -37,9 +37,11 @@ public class Toma {
     private Cliente cliente;
 
     @Column(nullable = false)
+    @Builder.Default
     private LocalDate fechaAlta = LocalDate.now();
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
+    @Builder.Default
     private EstadoToma estado = EstadoToma.ACTIVA;
 }

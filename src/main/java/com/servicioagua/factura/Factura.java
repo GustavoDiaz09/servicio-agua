@@ -41,12 +41,15 @@ public class Factura {
     private Integer consumoM3;
 
     @Column(nullable = false, precision = 10, scale = 2)
+    @Builder.Default
     private BigDecimal subtotal = BigDecimal.ZERO;
 
     @Column(name = "cargo_fijo", nullable = false, precision = 10, scale = 2)
+    @Builder.Default
     private BigDecimal cargoFijo = BigDecimal.ZERO;
 
     @Column(nullable = false, precision = 10, scale = 2)
+    @Builder.Default
     private BigDecimal total = BigDecimal.ZERO;
 
     @NotNull
@@ -63,6 +66,7 @@ public class Factura {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
+    @Builder.Default
     private EstadoFactura estado = EstadoFactura.PENDIENTE;
 
     public boolean estaPagada() {

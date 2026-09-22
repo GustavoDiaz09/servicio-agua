@@ -168,14 +168,20 @@ public class FacturaService {
 
     private BigDecimal calcularSubtotal(int consumoTotal, List<Tarifa> tramos) {
         BigDecimal subtotal = BigDecimal.ZERO;
+        int restante = consumoTotal;
         for (Tarifa tramo : tramos) {
-            if (consumoTotal <= tramo.getDesdeM3()) {
-                continue;
+            if (restante <= 0) {
+                break;
             }
-            int m3DelTramo = Math.min(consumoTotal, tramo.getHastaM3()) - tramo.getDesdeM3();
-            if (m3DelTramo > 0) {
-                subtotal = subtotal.add(tramo.getPrecioPorM3().multiply(BigDecimal.valueOf(m3DelTramo)));
+            int capacidad;
+            if (tramo.getDesdeM3() == 0) {
+                capacidad = tramo.getHastaM3();
+            } else {
+                capacidad = tramo.getHastaM3() - tramo.getDesdeM3() + 1;
             }
+            int m3DelTramo = Math.min(restante, capacidad);
+            subtotal = subtotal.add(tramo.getPrecioPorM3().multiply(BigDecimal.valueOf(m3DelTramo)));
+            restante -= m3DelTramo;
         }
         return subtotal.setScale(CENTAVOS, RoundingMode.HALF_UP);
     }

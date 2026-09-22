@@ -41,5 +41,6 @@ public class Tuberia {
 
     @NotNull
     @Column(name = "fecha_instalacion", nullable = false)
+    @Builder.Default
     private LocalDate fechaInstalacion = LocalDate.now();
 }

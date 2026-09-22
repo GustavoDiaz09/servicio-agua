@@ -15,13 +15,13 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class RegistrarPagoRequest {
 
-    @NotNull(message = "la factura es obligatoria")
+    @NotNull(message = "La factura es obligatoria")
     private Long facturaId;
 
-    @NotNull(message = "el monto es obligatorio")
+    @NotNull(message = "El monto es obligatorio")
     private BigDecimal monto;
 
-    @NotNull(message = "el método de pago es obligatorio")
+    @NotNull(message = "El método de pago es obligatorio")
     private MetodoPago metodo;
 
     private String referencia;

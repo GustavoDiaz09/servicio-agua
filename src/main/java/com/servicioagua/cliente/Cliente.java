@@ -48,8 +48,10 @@ public class Cliente {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
+    @Builder.Default
     private EstadoCliente estado = EstadoCliente.ACTIVO;
 
     @Column(nullable = false, updatable = false)
+    @Builder.Default
     private LocalDateTime fechaRegistro = LocalDateTime.now();
 }

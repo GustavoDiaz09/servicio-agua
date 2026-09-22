@@ -36,6 +36,7 @@ public class Pago {
 
     @NotNull
     @Column(name = "fecha_pago", nullable = false)
+    @Builder.Default
     private LocalDate fechaPago = LocalDate.now();
 
     @Enumerated(EnumType.STRING)

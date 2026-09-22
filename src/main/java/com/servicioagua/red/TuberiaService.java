@@ -1,6 +1,5 @@
 package com.servicioagua.red;
 
-import com.servicioagua.common.dto.ApiResponse;
 import com.servicioagua.common.exception.ResourceNotFoundException;
 import com.servicioagua.red.dto.TuberiaRequest;
 import com.servicioagua.red.dto.TuberiaResponse;
