@@ -246,6 +246,77 @@ class FacturaApiTests {
     }
 
     @Test
+    void generarFacturaConSobranteSobreUltimoTramoCobradoDevuelve201() throws Exception {
+        Cliente cliente = crearCliente("Cliente Sobrante");
+        Sector sector = crearSector();
+        Medidor medidor = crearMedidorConToma(cliente, sector);
+        crearLectura(medidor, LocalDate.of(2024, 5, 10), 240, 40);
+        LocalDate vigenteDesde = LocalDate.of(2024, 1, 1);
+        tarifaRepository.save(Tarifa.builder()
+                .nombre("Tarifa Con Tope")
+                .desdeM3(0)
+                .hastaM3(10)
+                .precioPorM3(new BigDecimal("1.5000"))
+                .cargoFijo(new BigDecimal("12500.00"))
+                .vigenteDesde(vigenteDesde)
+                .build());
+        tarifaRepository.save(Tarifa.builder()
+                .nombre("Tarifa Con Tope 2")
+                .desdeM3(11)
+                .hastaM3(30)
+                .precioPorM3(new BigDecimal("2.2500"))
+                .vigenteDesde(vigenteDesde)
+                .build());
+
+        mockMvc.perform(post("/api/facturas/generar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(generarFacturaJson(cliente.getId())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.consumoM3").value(40))
+                .andExpect(jsonPath("$.data.subtotal").value(82.50))
+                .andExpect(jsonPath("$.data.total").value(12582.50));
+    }
+
+    @Test
+    void generarFacturaTrasAnularLaAnteriorDevuelve201() throws Exception {
+        Cliente cliente = crearCliente("Cliente Refactura");
+        Sector sector = crearSector();
+        Medidor medidor = crearMedidorConToma(cliente, sector);
+        crearLectura(medidor, LocalDate.of(2024, 5, 10), 130, 30);
+        crearTarifasVigentes();
+        String body = generarFacturaJson(cliente.getId());
+
+        String primera = mockMvc.perform(post("/api/facturas/generar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.numero").value("FAC-2024-05-0001"))
+                .andReturn().getResponse().getContentAsString();
+
+        long primeraId = objectMapper.readTree(primera).get("data").get("id").asLong();
+
+        mockMvc.perform(put("/api/facturas/{id}/anular", primeraId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.estado").value("ANULADA"));
+
+        mockMvc.perform(post("/api/facturas/generar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.numero").value("FAC-2024-05-0002"))
+                .andExpect(jsonPath("$.data.estado").value("PENDIENTE"));
+    }
+
+    @Test
+    void obtenerFacturaConIdNoNumericoDevuelve400() throws Exception {
+        mockMvc.perform(get("/api/facturas/{id}", "abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
     void obtenerFacturaPorIdDevuelve200() throws Exception {
         Cliente cliente = crearCliente("Cliente Get");
         Factura factura = crearFactura(cliente, EstadoFactura.PENDIENTE,

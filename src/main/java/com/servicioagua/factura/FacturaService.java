@@ -47,11 +47,12 @@ public class FacturaService {
         if (request.getVencimiento().isBefore(request.getPeriodoHasta())) {
             throw new IllegalArgumentException("El vencimiento no puede ser anterior al fin del período facturado");
         }
-        Cliente cliente = clienteRepository.findById(request.getClienteId())
+        Cliente cliente = clienteRepository.findByIdConBloqueo(request.getClienteId())
                 .orElseThrow(() -> new ResourceNotFoundException("Cliente", request.getClienteId()));
 
-        if (facturaRepository.existsByClienteIdAndPeriodoDesde(cliente.getId(), request.getPeriodoDesde())) {
-            throw new BusinessException("Ya existe una factura para este cliente en el período");
+        if (facturaRepository.existsByClienteIdAndPeriodoDesdeAndEstadoNot(
+                cliente.getId(), request.getPeriodoDesde(), EstadoFactura.ANULADA)) {
+            throw new BusinessException("Ya existe una factura no anulada para este cliente en el período");
         }
 
         int consumoTotal = sumarConsumoPeriodo(cliente.getId(), request.getPeriodoDesde(), request.getPeriodoHasta());
@@ -185,6 +186,10 @@ public class FacturaService {
             int m3DelTramo = Math.min(restante, capacidad);
             subtotal = subtotal.add(tramo.getPrecioPorM3().multiply(BigDecimal.valueOf(m3DelTramo)));
             restante -= m3DelTramo;
+        }
+        if (restante > 0) {
+            BigDecimal precioTop = tramos.get(tramos.size() - 1).getPrecioPorM3();
+            subtotal = subtotal.add(precioTop.multiply(BigDecimal.valueOf(restante)));
         }
         return subtotal.setScale(CENTAVOS, RoundingMode.HALF_UP);
     }

@@ -1,7 +1,9 @@
 package com.servicioagua.factura;
 
 import com.servicioagua.common.enums.EstadoFactura;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -25,5 +27,13 @@ public interface FacturaRepository extends JpaRepository<Factura, Long> {
 
     long countByPeriodoDesde(LocalDate periodoDesde);
 
-    boolean existsByClienteIdAndPeriodoDesde(Long clienteId, LocalDate periodoDesde);
+    boolean existsByClienteIdAndPeriodoDesdeAndEstadoNot(Long clienteId, LocalDate periodoDesde, EstadoFactura estado);
+
+    @Query("SELECT MAX(f.periodoHasta) FROM Factura f " +
+            "WHERE f.cliente.id = :clienteId AND f.estado <> 'ANULADA'")
+    LocalDate maxPeriodoHastaNoAnulada(@Param("clienteId") Long clienteId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT f FROM Factura f WHERE f.id = :id")
+    java.util.Optional<Factura> findByIdConBloqueo(@Param("id") Long id);
 }

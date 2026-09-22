@@ -25,4 +25,9 @@ public interface LecturaRepository extends JpaRepository<Lectura, Long> {
 
     boolean existsByMedidorIdAndFechaLecturaAndEstadoNot(
             Long medidorId, LocalDate fechaLectura, EstadoLectura estado);
+
+    boolean existsByMedidorIdAndEstado(Long medidorId, EstadoLectura estado);
+
+    boolean existsByMedidorIdAndEstadoAndFechaLecturaGreaterThan(
+            Long medidorId, EstadoLectura estado, LocalDate fecha);
 }

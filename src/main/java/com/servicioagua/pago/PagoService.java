@@ -24,7 +24,7 @@ public class PagoService {
 
     @Transactional
     public PagoResponse registrar(RegistrarPagoRequest request) {
-        Factura factura = facturaRepository.findById(request.getFacturaId())
+        Factura factura = facturaRepository.findByIdConBloqueo(request.getFacturaId())
                 .orElseThrow(() -> new ResourceNotFoundException("Factura", request.getFacturaId()));
 
         if (factura.estaPagada()) {

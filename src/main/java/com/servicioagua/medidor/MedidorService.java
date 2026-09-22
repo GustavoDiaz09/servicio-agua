@@ -1,10 +1,12 @@
 package com.servicioagua.medidor;
 
+import com.servicioagua.common.enums.EstadoLectura;
 import com.servicioagua.common.enums.EstadoMedidor;
 import com.servicioagua.common.enums.EstadoToma;
 import com.servicioagua.common.exception.BusinessException;
 import com.servicioagua.common.exception.DuplicateResourceException;
 import com.servicioagua.common.exception.ResourceNotFoundException;
+import com.servicioagua.factura.FacturaRepository;
 import com.servicioagua.lectura.LecturaRepository;
 import com.servicioagua.medidor.dto.MedidorAsignacionRequest;
 import com.servicioagua.medidor.dto.MedidorEstadoRequest;
@@ -17,7 +19,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.YearMonth;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -28,6 +29,7 @@ public class MedidorService {
     private final MedidorRepository medidorRepository;
     private final TomaRepository tomaRepository;
     private final LecturaRepository lecturaRepository;
+    private final FacturaRepository facturaRepository;
 
     @Transactional
     public MedidorResponse crear(MedidorRequest request) {
@@ -74,7 +76,7 @@ public class MedidorService {
     @Transactional(readOnly = true)
     public MedidorResponse buscarPorSerie(String numeroSerie) {
         Medidor medidor = medidorRepository.findByNumeroSerie(numeroSerie)
-                .orElseThrow(() -> new ResourceNotFoundException("el medidor con serie", numeroSerie));
+                .orElseThrow(() -> new ResourceNotFoundException("No se encontró el medidor con serie: " + numeroSerie));
         return toResponse(medidor);
     }
 
@@ -104,11 +106,16 @@ public class MedidorService {
         if (medidor.getEstado() == EstadoMedidor.RETIRADO) {
             throw new BusinessException("El medidor ya está retirado");
         }
-        YearMonth mes = YearMonth.now();
-        boolean tieneLecturas = !lecturaRepository.findEntreFechas(
-                medidor.getId(), mes.atDay(1), mes.atEndOfMonth()).isEmpty();
-        if (tieneLecturas) {
-            throw new BusinessException("No se puede retirar el medidor: tiene lecturas en el período");
+        Toma toma = medidor.getToma();
+        if (toma != null) {
+            LocalDate corte = facturaRepository.maxPeriodoHastaNoAnulada(toma.getCliente().getId());
+            boolean tienePendientes = corte == null
+                    ? lecturaRepository.existsByMedidorIdAndEstado(medidor.getId(), EstadoLectura.ACTIVA)
+                    : lecturaRepository.existsByMedidorIdAndEstadoAndFechaLecturaGreaterThan(
+                            medidor.getId(), EstadoLectura.ACTIVA, corte);
+            if (tienePendientes) {
+                throw new BusinessException("No se puede retirar el medidor: tiene lecturas sin facturar");
+            }
         }
         medidor.setEstado(EstadoMedidor.RETIRADO);
         medidor.setToma(null);

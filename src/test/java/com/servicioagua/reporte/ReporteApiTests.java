@@ -199,6 +199,26 @@ class ReporteApiTests {
     }
 
     @Test
+    void clientesMorososDescuentaPagosDevuelve200() throws Exception {
+        Cliente cliente = crearCliente();
+        Factura factura = crearFactura(cliente, EstadoFactura.PENDIENTE,
+                new BigDecimal("1234.56"), LocalDate.of(2020, 1, 1));
+        pagoRepository.save(Pago.builder()
+                .factura(factura)
+                .monto(new BigDecimal("234.56"))
+                .fechaPago(LocalDate.of(2020, 1, 2))
+                .metodo(MetodoPago.EFECTIVO)
+                .build());
+
+        mockMvc.perform(get("/api/reportes/clientes-morosos"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].clienteId").value(cliente.getId().intValue()))
+                .andExpect(jsonPath("$.data[0].deudaTotal").value(1000.00));
+    }
+
+    @Test
     void fugasActivasDevuelve200ConSoloNoResueltas() throws Exception {
         Sector sector = crearSector();
         fugaRepository.save(Fuga.builder()

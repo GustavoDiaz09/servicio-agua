@@ -7,7 +7,6 @@ import com.servicioagua.common.enums.EstadoLectura;
 import com.servicioagua.common.exception.BusinessException;
 import com.servicioagua.common.exception.DuplicateResourceException;
 import com.servicioagua.common.exception.ResourceNotFoundException;
-import com.servicioagua.factura.Factura;
 import com.servicioagua.factura.FacturaRepository;
 import com.servicioagua.lectura.LecturaRepository;
 import com.servicioagua.medidor.MedidorRepository;
@@ -136,16 +135,12 @@ public class TomaService {
     }
 
     private void validarSinLecturasPendientes(Toma toma) {
-        LocalDate corte = facturaRepository.findByClienteIdOrderByPeriodoDesdeDesc(toma.getCliente().getId())
-                .stream()
-                .findFirst()
-                .map(Factura::getPeriodoHasta)
-                .orElse(null);
+        LocalDate corte = facturaRepository.maxPeriodoHastaNoAnulada(toma.getCliente().getId());
         boolean tienePendientes = medidorRepository.findByTomaId(toma.getId()).stream()
-                .anyMatch(medidor -> lecturaRepository.findByMedidorIdOrderByFechaLecturaDesc(medidor.getId())
-                        .stream()
-                        .filter(lectura -> lectura.getEstado() == EstadoLectura.ACTIVA)
-                        .anyMatch(lectura -> corte == null || lectura.getFechaLectura().isAfter(corte)));
+                .anyMatch(medidor -> corte == null
+                        ? lecturaRepository.existsByMedidorIdAndEstado(medidor.getId(), EstadoLectura.ACTIVA)
+                        : lecturaRepository.existsByMedidorIdAndEstadoAndFechaLecturaGreaterThan(
+                                medidor.getId(), EstadoLectura.ACTIVA, corte));
         if (tienePendientes) {
             throw new BusinessException("No se puede dar de baja la toma: tiene lecturas pendientes de facturar");
         }

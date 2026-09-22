@@ -242,6 +242,27 @@ class TomaMedidorApiTests {
     }
 
     @Test
+    void retirarMedidorConLecturasSinFacturarDevuelve409() throws Exception {
+        Sector sector = crearSector();
+        Cliente cliente = crearCliente();
+        long tomaId = crearTomaPorApi("TOM-0012", sector.getId(), cliente.getId());
+        long medidorId = crearMedidorPorApi("MTR-2012");
+        asignarMedidor(medidorId, tomaId);
+        Medidor medidor = medidorRepository.findById(medidorId).orElseThrow();
+        lecturaRepository.save(Lectura.builder()
+                .medidor(medidor)
+                .valorLectura(100)
+                .consumoM3(100)
+                .fechaLectura(LocalDate.now())
+                .estado(EstadoLectura.ACTIVA)
+                .build());
+
+        mockMvc.perform(put("/api/medidores/{id}/retirar", medidorId))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
     void retirarMedidorDevuelve200() throws Exception {
         Sector sector = crearSector();
         Cliente cliente = crearCliente();

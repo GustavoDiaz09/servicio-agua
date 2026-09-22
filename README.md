@@ -114,10 +114,11 @@ Todas las respuestas se envuelven en `ApiResponse<T>`:
 
 1. `Consumo = lectura actual − lectura anterior`; consumo negativo → 409 (relectura inválida). Una lectura `ANULADA` permite re-registrar en la misma fecha.
 2. Facturación **progresiva por tramos** de tarifa vigente a la fecha del período + cargo fijo. El vencimiento no puede ser anterior al fin del período facturado; una tarifa vigente hoy no puede eliminarse.
-3. Un **solo medidor activo** por toma; asignar otro retira el anterior.
+3. Un **solo medidor activo** por toma; asignar otro a una toma con medidor activo → 409 (se requiere retirar el anterior). Retirar un medidor con lecturas sin facturar → 409.
 4. Pagos totales o parciales; la factura pasa a `PAGADA` cuando `SUM(pagos) ≥ total`. No se aceptan montos mayores a la deuda pendiente (400).
 5. Facturas sin pago total con vencimiento superado → `VENCIDA` (job/consulta).
-6. Baja de toma solo si no hay lecturas sin facturar: lecturas `ACTIVA` posteriores al cierre de la última factura del cliente (o si el cliente no tiene facturas) bloquean la baja.
+6. Baja de toma solo si no hay lecturas sin facturar: lecturas `ACTIVA` posteriores al cierre de la última factura **no anulada** del cliente (o si el cliente no tiene facturas) bloquean la baja.
+7. Una factura `ANULADA` permite regenerar el mismo período. El consumo que excede el último tramo de tarifa se cobra al precio del tramo superior.
 
 ## Códigos de estado
 

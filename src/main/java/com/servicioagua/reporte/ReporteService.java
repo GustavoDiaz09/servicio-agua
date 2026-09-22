@@ -50,16 +50,20 @@ public class ReporteService {
 
     @Transactional(readOnly = true)
     public List<ClienteMorosoDto> clientesMorosos() {
-        Map<Long, List<Factura>> deudasPorCliente = reporteRepository
-                .findFacturasConDeuda(LocalDate.now())
-                .stream()
+        List<Factura> facturasConDeuda = reporteRepository.findFacturasConDeuda(LocalDate.now());
+        Map<Long, BigDecimal> pagosPorFactura = facturasConDeuda.isEmpty() ? Map.of()
+                : pagoRepository.sumMontosPorFacturas(facturasConDeuda.stream().map(Factura::getId).toList())
+                        .stream()
+                        .collect(Collectors.toMap(fila -> (Long) fila[0], fila -> (BigDecimal) fila[1]));
+
+        Map<Long, List<Factura>> deudasPorCliente = facturasConDeuda.stream()
                 .collect(Collectors.groupingBy(f -> f.getCliente().getId(),
                         LinkedHashMap::new, Collectors.toList()));
 
         return deudasPorCliente.values().stream().map(facturas -> {
             Cliente cliente = facturas.get(0).getCliente();
             BigDecimal deudaTotal = facturas.stream()
-                    .map(Factura::getTotal)
+                    .map(f -> f.getTotal().subtract(pagosPorFactura.getOrDefault(f.getId(), BigDecimal.ZERO)))
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             List<FacturaMorosaDto> detalle = facturas.stream()
                     .map(this::toFacturaMorosa)
