@@ -44,6 +44,9 @@ public class FacturaService {
         if (request.getPeriodoHasta().isBefore(request.getPeriodoDesde())) {
             throw new IllegalArgumentException("El período hasta no puede ser anterior al período desde");
         }
+        if (request.getVencimiento().isBefore(request.getPeriodoHasta())) {
+            throw new IllegalArgumentException("El vencimiento no puede ser anterior al fin del período facturado");
+        }
         Cliente cliente = clienteRepository.findById(request.getClienteId())
                 .orElseThrow(() -> new ResourceNotFoundException("Cliente", request.getClienteId()));
 

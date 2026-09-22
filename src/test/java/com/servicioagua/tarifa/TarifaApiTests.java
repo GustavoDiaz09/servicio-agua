@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -29,6 +30,9 @@ class TarifaApiTests {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private TarifaRepository tarifaRepository;
 
     private String tarifaJson(String nombre, int desde, int hasta, String precio, String cargoFijo,
                               LocalDate vigenteDesde, LocalDate vigenteHasta) throws Exception {
@@ -96,6 +100,37 @@ class TarifaApiTests {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.length()").value(greaterThanOrEqualTo(1)))
                 .andExpect(jsonPath("$.data[0].nombre").exists());
+    }
+
+    @Test
+    void eliminarTarifaVigenteDevuelve409() throws Exception {
+        Tarifa tarifa = tarifaRepository.save(Tarifa.builder()
+                .nombre("Tarifa Vigente Eliminar")
+                .desdeM3(0)
+                .hastaM3(10)
+                .precioPorM3(new BigDecimal("1.5000"))
+                .vigenteDesde(LocalDate.of(2024, 1, 1))
+                .build());
+
+        mockMvc.perform(delete("/api/tarifas/{id}", tarifa.getId()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void eliminarTarifaExpiradaDevuelve200() throws Exception {
+        Tarifa tarifa = tarifaRepository.save(Tarifa.builder()
+                .nombre("Tarifa Expirada Eliminar")
+                .desdeM3(0)
+                .hastaM3(10)
+                .precioPorM3(new BigDecimal("1.5000"))
+                .vigenteDesde(LocalDate.of(2019, 1, 1))
+                .vigenteHasta(LocalDate.of(2019, 12, 31))
+                .build());
+
+        mockMvc.perform(delete("/api/tarifas/{id}", tarifa.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
     }
 
     @Test

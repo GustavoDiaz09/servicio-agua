@@ -18,6 +18,7 @@ import java.time.LocalDate;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -148,6 +149,28 @@ class LecturaApiTests {
                         .content(lecturaJson(medidor.getId(), 150, LocalDate.of(2024, 5, 10))))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void anularYReRegistrarEnLaMismaFechaDevuelve201() throws Exception {
+        Medidor medidor = crearMedidor("MTR-3007", null);
+        Lectura lectura = lecturaRepository.save(Lectura.builder()
+                .medidor(medidor)
+                .valorLectura(100)
+                .consumoM3(100)
+                .fechaLectura(LocalDate.of(2024, 5, 10))
+                .estado(EstadoLectura.ACTIVA)
+                .build());
+
+        mockMvc.perform(put("/api/lecturas/{id}/anular", lectura.getId()))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/lecturas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(lecturaJson(medidor.getId(), 150, LocalDate.of(2024, 5, 10))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.valorLectura").value(150));
     }
 
     @Test

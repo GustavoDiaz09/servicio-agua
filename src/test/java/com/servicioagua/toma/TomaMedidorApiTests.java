@@ -4,7 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.servicioagua.cliente.Cliente;
 import com.servicioagua.cliente.ClienteRepository;
 import com.servicioagua.common.enums.EstadoCliente;
+import com.servicioagua.common.enums.EstadoLectura;
 import com.servicioagua.common.enums.TipoCliente;
+import com.servicioagua.lectura.Lectura;
+import com.servicioagua.lectura.LecturaRepository;
+import com.servicioagua.medidor.Medidor;
+import com.servicioagua.medidor.MedidorRepository;
 import com.servicioagua.medidor.dto.MedidorAsignacionRequest;
 import com.servicioagua.medidor.dto.MedidorRequest;
 import com.servicioagua.red.Sector;
@@ -19,6 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -42,6 +48,12 @@ class TomaMedidorApiTests {
 
     @Autowired
     private ClienteRepository clienteRepository;
+
+    @Autowired
+    private MedidorRepository medidorRepository;
+
+    @Autowired
+    private LecturaRepository lecturaRepository;
 
     private Sector crearSector() {
         return sectorRepository.save(Sector.builder()
@@ -194,6 +206,39 @@ class TomaMedidorApiTests {
                                 MedidorAsignacionRequest.builder().tomaId(tomaId).build())))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void darDeBajaConLecturasPendientesDevuelve409() throws Exception {
+        Sector sector = crearSector();
+        Cliente cliente = crearCliente();
+        long tomaId = crearTomaPorApi("TOM-0010", sector.getId(), cliente.getId());
+        long medidorId = crearMedidorPorApi("MTR-2010");
+        asignarMedidor(medidorId, tomaId);
+        Medidor medidor = medidorRepository.findById(medidorId).orElseThrow();
+        lecturaRepository.save(Lectura.builder()
+                .medidor(medidor)
+                .valorLectura(100)
+                .consumoM3(100)
+                .fechaLectura(LocalDate.now())
+                .estado(EstadoLectura.ACTIVA)
+                .build());
+
+        mockMvc.perform(put("/api/tomas/{id}/baja", tomaId))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void darDeBajaSinLecturasPendientesDevuelve200() throws Exception {
+        Sector sector = crearSector();
+        Cliente cliente = crearCliente();
+        long tomaId = crearTomaPorApi("TOM-0011", sector.getId(), cliente.getId());
+
+        mockMvc.perform(put("/api/tomas/{id}/baja", tomaId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.estado").value("DADA_DE_BAJA"));
     }
 
     @Test

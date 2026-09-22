@@ -16,6 +16,27 @@ Método: lectura completa del código (sin ejecutar Maven). Revisión de imports
 
 No se detectaron otros imports sin usar en el código (se revisaron los 109 archivos). Los mensajes restantes del proyecto están en español y los identificadores/nombres de métodos/columnas en inglés, conforme al estándar.
 
+## 1-bis. Resoluciones del orquestador (2026-09-22)
+
+Decisión sobre los hallazgos de la sección 2. Cada ítem fue atendido y verificado con tests (`.\mvnw.cmd -q test` → 65/65).
+
+| Item | Decisión | Implementación |
+|---|---|---|
+| 1 (off-by-one tarifa) | Corregir | `FacturaService.calcularSubtotal` con patrón "restante" y capacidad de banda (`desde=0 → hasta`; si no `hasta-desde+1`). Tests: `FacturaApiTests.generarFacturaConLecturasDevuelve201ConTotalesCorrectos` (60.00 / 12560.00). |
+| 2 (re-registro de lectura) | Permitir re-registro si la anterior está `ANULADA` | `LecturaRepository.existsByMedidorIdAndFechaLecturaAndEstadoNot(..., ANULADA)` + `LecturaService:31`. Test: `LecturaApiTests.anularYReRegistrarEnLaMismaFechaDevuelve201`. |
+| 3 (NoHandlerFoundException → 500) | Mapear a 404 JSON | `@ExceptionHandler(NoHandlerFoundException.class)` en `GlobalExceptionHandler`. Se conserva `spring.mvc.throw-exception-if-no-handler-found` (funcional en Boot 3.3; deprecación sin impacto). |
+| 4 (springdoc expuesto) | Documentar restricción (sin añadir dependencias) | Sección "Seguridad en producción" en `README.md`. |
+| 5 (update no valida vacíos) | Rechazar blank en `documento`/`nombre` | Guards en `ClienteService.update` → 400. Test: `ClienteApiTests.actualizarClienteConDocumentoVacioDevuelve400`. |
+| 6 (vencimiento < fin de período) | Validar | `FacturaService.generar` rechaza vencimiento anterior a `periodoHasta` → 400. Test: `FacturaApiTests.generarFacturaConVencimientoAnteriorAlPeriodoDevuelve400`. |
+| 7 (baja con lecturas pendientes) | **Regla definida por el negocio**: bloquear si CUALQUIER medidor de la toma tiene lecturas `ACTIVA` posteriores al cierre de la última factura del cliente (o si no existen facturas) | `TomaService.validarSinLecturasPendientes` (inyecta `FacturaRepository`). Tests: `TomaMedidorApiTests.darDeBajaConLecturasPendientesDevuelve409` / `darDeBajaSinLecturasPendientesDevuelve200`. |
+| 8 (sobrepago) | **Regla definida por el negocio**: rechazar monto > deuda pendiente → 400 | `PagoService.registrar` compara `monto` contra `total - SUM(pagos)`. Test: `PagoApiTests.pagoMayorADeudaPendienteDevuelve400`. |
+| 9 (eliminar tarifa vigente) | **Regla definida por el negocio**: bloquear borrado si está vigente hoy → 409 | `TarifaService.eliminar`. Tests: `TarifaApiTests.eliminarTarifaVigenteDevuelve409` / `eliminarTarifaExpiradaDevuelve200`. |
+| 10 (mensajes inconsistentes) | Mantenido (cosmético) | No se modifica para no alterar el contrato de API; los mensajes son claros en ambos formatos. |
+| 11 (código muerto) | Mantenido | Fase 0; no se toca. |
+| 12 (estilo) | Mantenido (cosmético) | Sin impacto funcional. |
+
+Tests añadidos: 8 (65 en total, todos verdes).
+
 ## 2. Hallazgos detectados NO corregidos
 
 Ordenados por severidad. Requieren decisión del orquestador o del agente dueño del módulo.

@@ -118,6 +118,17 @@ class PagoApiTests {
     }
 
     @Test
+    void pagoMayorADeudaPendienteDevuelve400() throws Exception {
+        Factura factura = crearFactura(EstadoFactura.PENDIENTE, new BigDecimal("100.00"));
+
+        mockMvc.perform(post("/api/pagos")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(pagoJson(factura.getId(), new BigDecimal("150.00"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
     void pagoSobreFacturaPagadaDevuelve409() throws Exception {
         Factura factura = crearFactura(EstadoFactura.PAGADA, new BigDecimal("100.00"));
 

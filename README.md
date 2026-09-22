@@ -67,6 +67,12 @@ Variables de entorno (con defaults para dev):
 > CREATE DATABASE bd_servicio_agua;
 > ```
 
+## Seguridad en producción
+
+- `springdoc` expone **Swagger UI** (`/swagger-ui.html`) y **OpenAPI** (`/v3/api-docs`) sin autenticación. El proyecto no incluye spring-security; en producción restringir esos endpoints por red/proxy/gateway o añadir seguridad si el responsable lo autoriza.
+- Desconocidos → 404 con `ApiResponse` uniforme (`NoHandlerFoundException` mapeado en `GlobalExceptionHandler`).
+- Credenciales de BD solo por variables de entorno (nunca en el repositorio).
+
 ## Ejecución
 
 ```powershell
@@ -106,12 +112,12 @@ Todas las respuestas se envuelven en `ApiResponse<T>`:
 
 ## Reglas de negocio
 
-1. `Consumo = lectura actual − lectura anterior`; consumo negativo → 409 (relectura inválida).
-2. Facturación **progresiva por tramos** de tarifa vigente a la fecha del período + cargo fijo.
+1. `Consumo = lectura actual − lectura anterior`; consumo negativo → 409 (relectura inválida). Una lectura `ANULADA` permite re-registrar en la misma fecha.
+2. Facturación **progresiva por tramos** de tarifa vigente a la fecha del período + cargo fijo. El vencimiento no puede ser anterior al fin del período facturado; una tarifa vigente hoy no puede eliminarse.
 3. Un **solo medidor activo** por toma; asignar otro retira el anterior.
-4. Pagos totales o parciales; la factura pasa a `PAGADA` cuando `SUM(pagos) ≥ total`.
+4. Pagos totales o parciales; la factura pasa a `PAGADA` cuando `SUM(pagos) ≥ total`. No se aceptan montos mayores a la deuda pendiente (400).
 5. Facturas sin pago total con vencimiento superado → `VENCIDA` (job/consulta).
-6. Baja de toma solo si su medidor no tiene lecturas pendientes del período.
+6. Baja de toma solo si no hay lecturas sin facturar: lecturas `ACTIVA` posteriores al cierre de la última factura del cliente (o si el cliente no tiene facturas) bloquean la baja.
 
 ## Códigos de estado
 

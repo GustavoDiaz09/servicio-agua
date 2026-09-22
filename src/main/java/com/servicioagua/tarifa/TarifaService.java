@@ -77,6 +77,11 @@ public class TarifaService {
     @Transactional
     public void eliminar(Long id) {
         Tarifa tarifa = obtener(id);
+        LocalDate hoy = LocalDate.now();
+        LocalDate finVigencia = tarifa.getVigenteHasta() != null ? tarifa.getVigenteHasta() : LocalDate.MAX;
+        if (!hoy.isBefore(tarifa.getVigenteDesde()) && !hoy.isAfter(finVigencia)) {
+            throw new BusinessException("La tarifa está vigente y no puede eliminarse");
+        }
         tarifaRepository.delete(tarifa);
     }
 

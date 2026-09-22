@@ -226,6 +226,26 @@ class FacturaApiTests {
     }
 
     @Test
+    void generarFacturaConVencimientoAnteriorAlPeriodoDevuelve400() throws Exception {
+        Cliente cliente = crearCliente("Cliente Vencimiento Inválido");
+        Sector sector = crearSector();
+        Medidor medidor = crearMedidorConToma(cliente, sector);
+        crearLectura(medidor, LocalDate.of(2024, 5, 10), 130, 30);
+        crearTarifasVigentes();
+
+        mockMvc.perform(post("/api/facturas/generar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(GenerarFacturaRequest.builder()
+                                .clienteId(cliente.getId())
+                                .periodoDesde(LocalDate.of(2024, 5, 1))
+                                .periodoHasta(LocalDate.of(2024, 5, 31))
+                                .vencimiento(LocalDate.of(2024, 5, 30))
+                                .build())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
     void obtenerFacturaPorIdDevuelve200() throws Exception {
         Cliente cliente = crearCliente("Cliente Get");
         Factura factura = crearFactura(cliente, EstadoFactura.PENDIENTE,

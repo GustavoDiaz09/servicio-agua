@@ -2,13 +2,14 @@ package com.servicioagua.toma;
 
 import com.servicioagua.cliente.Cliente;
 import com.servicioagua.cliente.ClienteRepository;
-import com.servicioagua.common.enums.EstadoMedidor;
 import com.servicioagua.common.enums.EstadoToma;
+import com.servicioagua.common.enums.EstadoLectura;
 import com.servicioagua.common.exception.BusinessException;
 import com.servicioagua.common.exception.DuplicateResourceException;
 import com.servicioagua.common.exception.ResourceNotFoundException;
+import com.servicioagua.factura.Factura;
+import com.servicioagua.factura.FacturaRepository;
 import com.servicioagua.lectura.LecturaRepository;
-import com.servicioagua.medidor.Medidor;
 import com.servicioagua.medidor.MedidorRepository;
 import com.servicioagua.red.Sector;
 import com.servicioagua.red.SectorRepository;
@@ -20,7 +21,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.YearMonth;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -33,6 +33,7 @@ public class TomaService {
     private final ClienteRepository clienteRepository;
     private final MedidorRepository medidorRepository;
     private final LecturaRepository lecturaRepository;
+    private final FacturaRepository facturaRepository;
 
     @Transactional
     public TomaResponse crear(TomaRequest request) {
@@ -128,19 +129,25 @@ public class TomaService {
         if (toma.getEstado() == EstadoToma.DADA_DE_BAJA) {
             throw new BusinessException("La toma ya está dada de baja");
         }
-        medidorRepository.findByTomaIdAndEstado(id, EstadoMedidor.ACTIVO)
-                .ifPresent(medidor -> validarSinLecturasEnMes(medidor));
+        validarSinLecturasPendientes(toma);
 
         toma.setEstado(EstadoToma.DADA_DE_BAJA);
         return toResponse(tomaRepository.save(toma));
     }
 
-    private void validarSinLecturasEnMes(Medidor medidor) {
-        YearMonth mes = YearMonth.now();
-        boolean tieneLecturas = !lecturaRepository.findEntreFechas(
-                medidor.getId(), mes.atDay(1), mes.atEndOfMonth()).isEmpty();
-        if (tieneLecturas) {
-            throw new BusinessException("No se puede dar de baja la toma: tiene lecturas en el período");
+    private void validarSinLecturasPendientes(Toma toma) {
+        LocalDate corte = facturaRepository.findByClienteIdOrderByPeriodoDesdeDesc(toma.getCliente().getId())
+                .stream()
+                .findFirst()
+                .map(Factura::getPeriodoHasta)
+                .orElse(null);
+        boolean tienePendientes = medidorRepository.findByTomaId(toma.getId()).stream()
+                .anyMatch(medidor -> lecturaRepository.findByMedidorIdOrderByFechaLecturaDesc(medidor.getId())
+                        .stream()
+                        .filter(lectura -> lectura.getEstado() == EstadoLectura.ACTIVA)
+                        .anyMatch(lectura -> corte == null || lectura.getFechaLectura().isAfter(corte)));
+        if (tienePendientes) {
+            throw new BusinessException("No se puede dar de baja la toma: tiene lecturas pendientes de facturar");
         }
     }
 

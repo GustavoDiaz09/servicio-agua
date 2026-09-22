@@ -131,6 +131,24 @@ class ClienteApiTests {
     }
 
     @Test
+    void actualizarClienteConDocumentoVacioDevuelve400() throws Exception {
+        Cliente cliente = crearCliente("1234567890", "Juan Pérez");
+
+        mockMvc.perform(put("/api/clientes/{id}", cliente.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(ClienteRequest.builder()
+                                .documento("")
+                                .nombre("Juan Pérez")
+                                .telefono("3001234567")
+                                .email("cliente@correo.com")
+                                .direccion("Calle 1 #2-3")
+                                .tipo(TipoCliente.RESIDENCIAL)
+                                .build())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
     void cambiarEstadoClienteDevuelve200() throws Exception {
         Cliente cliente = crearCliente("1234567890", "Juan Pérez");
         mockMvc.perform(put("/api/clientes/{id}/estado", cliente.getId())

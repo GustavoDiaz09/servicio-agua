@@ -27,8 +27,9 @@ public class LecturaService {
         Medidor medidor = medidorRepository.findById(request.getMedidorId())
                 .orElseThrow(() -> new ResourceNotFoundException("el medidor", request.getMedidorId()));
 
-        if (lecturaRepository.existsByMedidorIdAndFechaLectura(request.getMedidorId(), request.getFechaLectura())) {
-            throw new BusinessException("Ya existe una lectura registrada para este medidor en esa fecha");
+        if (lecturaRepository.existsByMedidorIdAndFechaLecturaAndEstadoNot(
+                request.getMedidorId(), request.getFechaLectura(), EstadoLectura.ANULADA)) {
+            throw new BusinessException("Ya existe una lectura activa registrada para este medidor en esa fecha");
         }
 
         Integer anterior = lecturaRepository

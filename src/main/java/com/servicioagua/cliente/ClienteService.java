@@ -63,14 +63,20 @@ public class ClienteService {
     @Transactional
     public Cliente update(Long id, ClienteRequest request) {
         Cliente cliente = findById(id);
-        if (request.getDocumento() != null && !request.getDocumento().equals(cliente.getDocumento())
-                && clienteRepository.existsByDocumento(request.getDocumento())) {
-            throw new DuplicateResourceException("Ya existe un cliente con el documento " + request.getDocumento());
-        }
         if (request.getDocumento() != null) {
+            if (request.getDocumento().isBlank()) {
+                throw new IllegalArgumentException("El documento no puede estar vacío");
+            }
+            if (!request.getDocumento().equals(cliente.getDocumento())
+                    && clienteRepository.existsByDocumento(request.getDocumento())) {
+                throw new DuplicateResourceException("Ya existe un cliente con el documento " + request.getDocumento());
+            }
             cliente.setDocumento(request.getDocumento());
         }
         if (request.getNombre() != null) {
+            if (request.getNombre().isBlank()) {
+                throw new IllegalArgumentException("El nombre no puede estar vacío");
+            }
             cliente.setNombre(request.getNombre());
         }
         if (request.getTelefono() != null) {

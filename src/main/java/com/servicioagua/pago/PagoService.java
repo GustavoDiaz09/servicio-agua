@@ -35,6 +35,12 @@ public class PagoService {
             throw new IllegalArgumentException("El monto debe ser mayor a 0");
         }
 
+        BigDecimal totalPagado = pagoRepository.sumMontosByFacturaId(factura.getId());
+        BigDecimal deudaPendiente = factura.getTotal().subtract(totalPagado);
+        if (request.getMonto().compareTo(deudaPendiente) > 0) {
+            throw new IllegalArgumentException("El monto supera la deuda pendiente de la factura");
+        }
+
         Pago pago = Pago.builder()
                 .factura(factura)
                 .monto(request.getMonto())
@@ -44,10 +50,10 @@ public class PagoService {
                 .build();
         pagoRepository.save(pago);
 
-        BigDecimal totalPagado = pagoRepository.sumMontosByFacturaId(factura.getId());
-        if (totalPagado.compareTo(factura.getTotal()) >= 0) {
+        BigDecimal totalPagadoActualizado = pagoRepository.sumMontosByFacturaId(factura.getId());
+        if (totalPagadoActualizado.compareTo(factura.getTotal()) >= 0) {
             factura.setEstado(EstadoFactura.PAGADA);
-        } else if (totalPagado.compareTo(BigDecimal.ZERO) > 0) {
+        } else if (totalPagadoActualizado.compareTo(BigDecimal.ZERO) > 0) {
             factura.setEstado(EstadoFactura.PARCIAL);
         }
         facturaRepository.save(factura);
