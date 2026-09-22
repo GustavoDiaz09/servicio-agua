@@ -1,0 +1,27 @@
+# Build
+target/
+*.class
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+nbproject/
+.nb-gradle/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Logs
+*.log
+
+# Maven wrapper jar (generado por `mvn wrapper:wrapper`)
+# .mvn/wrapper/*.jar
+
+# Environment
+.env
+.env.*

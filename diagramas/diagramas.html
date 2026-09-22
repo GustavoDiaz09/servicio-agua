@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Diagramas - Sistema de Gestión de Agua Potable</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  @page { size: A4 landscape; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    margin: 0;
+    color: #1a1a2e;
+    background: #fff;
+  }
+  .cover {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    background: linear-gradient(135deg, #0077b6 0%, #00b4d8 100%);
+    color: #fff;
+    page-break-after: always;
+  }
+  .cover h1 { font-size: 2.6rem; margin-bottom: 8px; }
+  .cover h2 { font-weight: 400; font-size: 1.3rem; opacity: .9; }
+  .cover .meta { margin-top: 40px; font-size: .95rem; opacity: .85; line-height: 1.7; }
+  .page {
+    page-break-after: always;
+    padding: 10mm 8mm;
+    min-height: 90vh;
+  }
+  .page:last-child { page-break-after: auto; }
+  .page h2 {
+    font-size: 1.5rem;
+    color: #0077b6;
+    border-bottom: 3px solid #00b4d8;
+    padding-bottom: 8px;
+    margin-top: 0;
+  }
+  .page h3 { color: #023e8a; font-size: 1.05rem; margin-bottom: 4px; }
+  .page p.desc { color: #444; font-size: .95rem; margin-top: 0; }
+  .diagram-box {
+    background: #f8fbfd;
+    border: 1px solid #d0e3f0;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 14px 0;
+    text-align: center;
+  }
+  .mermaid { display: inline-block; text-align: left; }
+  .legend {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    font-size: .85rem;
+    margin-top: 10px;
+    color: #333;
+  }
+  .legend span::before {
+    content: "■";
+    margin-right: 6px;
+  }
+  .toc { max-width: 640px; margin: 40px auto 0; text-align: left; background: rgba(255,255,255,.12); border-radius: 10px; padding: 24px 32px; }
+  .toc ol { margin: 0; padding-left: 20px; line-height: 2; font-size: 1.05rem; }
+  table { border-collapse: collapse; width: 100%; font-size: .88rem; margin-top: 10px; }
+  th, td { border: 1px solid #b8d4e8; padding: 6px 10px; text-align: left; }
+  th { background: #e3f2fb; color: #023e8a; }
+  tr:nth-child(even) td { background: #f4fafd; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>Sistema de Gestión de Agua Potable</h1>
+  <h2>Documentación de Diagramas</h2>
+  <div class="toc">
+    <ol>
+      <li>Arquitectura por capas</li>
+      <li>Diagrama de clases / paquetes</li>
+      <li>Diagrama Entidad–Relación (ER)</li>
+      <li>Diagrama de secuencia: Emisión de factura</li>
+      <li>Diagrama de secuencia: Registro de lectura y pago</li>
+      <li>Diagrama de despliegue</li>
+      <li>Mapa de módulos y endpoints</li>
+    </ol>
+  </div>
+  <div class="meta">
+    Java · Spring Boot · Spring Data JPA · PostgreSQL · Maven<br>
+    Arquitectura por capas · Septiembre 2026
+  </div>
+</div>
+
+<!-- 1. ARQUITECTURA POR CAPAS -->
+<div class="page">
+  <h2>1. Arquitectura por capas</h2>
+  <p class="desc">Separación de responsabilidades en 4 capas: Controller → Service → Repository → Entity.</p>
+  <div class="diagram-box">
+    <pre class="mermaid">
+flowchart TB
+    subgraph CAP1["Capa 1 — Controller (REST API)"]
+        C1["Endpoints HTTP<br/>DTOs de entrada/salida<br/>Validación Jakarta<br/>Códigos de estado"]
+    end
+    subgraph CAP2["Capa 2 — Service (Lógica de negocio)"]
+        S1["Cálculo de consumos<br/>Facturación progresiva<br/>Estados y transacciones<br/>Reglas del dominio"]
+    end
+    subgraph CAP3["Capa 3 — Repository (Spring Data JPA)"]
+        R1["Consultas JPQL / Criteria<br/>Paginación<br/>Métodos derivados"]
+    end
+    subgraph CAP4["Capa 4 — Entity (Hibernate)"]
+        E1["Mapeo a tablas PostgreSQL<br/>Relaciones JPA<br/>Constraints del esquema"]
+    end
+    C1 --> S1
+    S1 --> R1
+    R1 --> E1
+    E1 --> DB[("PostgreSQL<br/>bd_servicio_agua")]
+    style CAP1 fill:#e3f2fb,stroke:#0077b6,stroke-width:2px
+    style CAP2 fill:#e8f8f5,stroke:#00b4d8,stroke-width:2px
+    style CAP3 fill:#fef9e7,stroke:#f4a261,stroke-width:2px
+    style CAP4 fill:#fdecea,stroke:#e76f51,stroke-width:2px
+    style DB fill:#dbe9ff,stroke:#023e8a,stroke-width:2px
+    </pre>
+  </div>
+  <h3>Estructura de paquetes</h3>
+  <div class="diagram-box">
+    <pre class="mermaid">
+flowchart LR
+    root["com.servicioagua"] --> cfg["config/<br/>CORS · OpenAPI · Seeds"]
+    root --> common["common/<br/>Errores globales · ApiResponse"]
+    root --> cl["cliente/"]
+    root --> md["medidor/"]
+    root --> lc["lectura/"]
+    root --> tf["tarifa/"]
+    root --> fc["factura/"]
+    root --> pg["pago/"]
+    root --> rd["red/<br/>sectores · tuberías · fugas"]
+    root --> rp["reporte/"]
+    style root fill:#0077b6,stroke:#023e8a,color:#fff
+    style cl fill:#e3f2fb
+    style md fill:#e3f2fb
+    style lc fill:#e8f8f5
+    style tf fill:#e8f8f5
+    style fc fill:#fef9e7
+    style pg fill:#fef9e7
+    style rd fill:#fdecea
+    style rp fill:#f3e8fd
+    </pre>
+  </div>
+  <p class="desc">Cada módulo sigue la misma estructura interna: <strong>controller / service / repository / entity / dto</strong>.</p>
+</div>
+
+<!-- 2. DIAGRAMA DE CLASES -->
+<div class="page">
+  <h2>2. Diagrama de clases (dominio principal)</h2>
+  <p class="desc">Clases JPA con atributos y multiplicidades entre los módulos del negocio.</p>
+  <div class="diagram-box">
+    <pre class="mermaid">
+classDiagram
+    class Cliente {
+        +Long id
+        +String documento
+        +String nombre
+        +String telefono
+        +String email
+        +String direccion
+        +TipoCliente tipo
+        +Estado estado
+    }
+    class Tomа {
+        +Long id
+        +String codigo
+        +Date fechaAlta
+        +Estado estado
+    }
+    class Medidor {
+        +Long id
+        +String numeroSerie
+        +Date fechaInstalacion
+        +Estado estado
+    }
+    class Lectura {
+        +Long id
+        +int valorLectura
+        +int consumo
+        +Date fechaLectura
+        +EstadoLectura estado
+        +String observacion
+    }
+    class Tarifa {
+        +Long id
+        +String nombre
+        +int desdeM3
+        +int hastaM3
+        +BigDecimal precioPorM3
+        +BigDecimal cargoFijo
+        +Date vigenteDesde
+        +Date vigenteHasta
+    }
+    class Factura {
+        +Long id
+        +String numero
+        +int consumoM3
+        +BigDecimal subtotal
+        +BigDecimal cargoFijo
+        +BigDecimal total
+        +Date vencimiento
+        +EstadoFactura estado
+    }
+    class Pago {
+        +Long id
+        +BigDecimal monto
+        +Date fechaPago
+        +MetodoPago metodo
+        +String referencia
+    }
+    class Sector {
+        +Long id
+        +String nombre
+        +String zona
+        +BigDecimal presionPromedio
+    }
+    class Tuberia {
+        +Long id
+        +String material
+        +double diametroMm
+        +double longitudM
+        +String tramo
+    }
+    class Fuga {
+        +Long id
+        +String ubicacion
+        +Severidad severidad
+        +EstadoFuga estado
+        +Date fechaReporte
+    }
+    class Mantenimiento {
+        +Long id
+        +String descripcion
+        +TipoMantenimiento tipo
+        +Date fechaProgramada
+        +Estado estado
+    }
+
+    Cliente "1" -- "0..*" Tomа : posee
+    Tomа "1" -- "1" Medidor : tiene instalado
+    Medidor "1" -- "0..*" Lectura : registra
+    Lectura "0..*" -- "1" Tarifa : calculada con
+    Cliente "1" -- "0..*" Factura : recibe
+    Lectura "1" -- "0..*" Factura : origina
+    Factura "1" -- "0..*" Pago : se paga con
+    Sector "1" -- "0..*" Tomа : agrupa
+    Sector "1" -- "0..*" Tuberia : compone
+    Sector "1" -- "0..*" Fuga : presenta
+    Sector "1" -- "0..*" Mantenimiento : recibe
+    </pre>
+  </div>
+</div>
+
+<!-- 3. DIAGRAMA ER -->
+<div class="page">
+  <h2>3. Diagrama Entidad–Relación (ER)</h2>
+  <p class="desc">Modelo lógico de la base de datos PostgreSQL. PK = clave primaria, FK = clave foránea, UK = única.</p>
+  <div class="diagram-box">
+    <pre class="mermaid">
+erDiagram
+    CLIENTE ||--o{ TOMA : "posee"
+    SECTOR ||--o{ TOMA : "agrupa"
+    TOMA ||--o| MEDIDOR : "tiene"
+    MEDIDOR ||--o{ LECTURA : "registra"
+    LECTURA }o--|| TARIFA : "se factura con"
+    CLIENTE ||--o{ FACTURA : "recibe"
+    LECTURA ||--o{ FACTURA : "origina"
+    FACTURA ||--o{ PAGO : "cancela"
+    SECTOR ||--o{ TUBERIA : "compone"
+    SECTOR ||--o{ FUGA : "presenta"
+    SECTOR ||--o{ MANTENIMIENTO : "recibe"
+
+    CLIENTE {
+        bigserial id PK
+        varchar documento UK
+        varchar nombre
+        varchar telefono
+        varchar email
+        varchar direccion
+        enum tipo_cliente
+        enum estado
+    }
+    SECTOR {
+        bigserial id PK
+        varchar nombre UK
+        varchar zona
+        numeric presion_promedio
+    }
+    TOMA {
+        bigserial id PK
+        varchar codigo UK
+        bigint sector_id FK
+        bigint cliente_id FK
+        date fecha_alta
+        enum estado
+    }
+    MEDIDOR {
+        bigserial id PK
+        varchar numero_serie UK
+        bigint toma_id FK
+        date fecha_instalacion
+        enum estado
+    }
+    LECTURA {
+        bigserial id PK
+        bigint medidor_id FK
+        bigint tarifa_id FK
+        int valor_lectura
+        int consumo_m3
+        date fecha_lectura
+        enum estado
+        varchar observacion
+    }
+    TARIFA {
+        bigserial id PK
+        varchar nombre
+        int desde_m3
+        int hasta_m3
+        numeric precio_por_m3
+        numeric cargo_fijo
+        date vigente_desde
+        date vigente_hasta
+    }
+    FACTURA {
+        bigserial id PK
+        varchar numero UK
+        bigint cliente_id FK
+        bigint lectura_id FK
+        int consumo_m3
+        numeric subtotal
+        numeric cargo_fijo
+        numeric total
+        date periodo_desde
+        date periodo_hasta
+        date vencimiento
+        enum estado
+    }
+    PAGO {
+        bigserial id PK
+        bigint factura_id FK
+        numeric monto
+        date fecha_pago
+        enum metodo
+        varchar referencia
+    }
+    TUBERIA {
+        bigserial id PK
+        bigint sector_id FK
+        varchar material
+        numeric diametro_mm
+        numeric longitud_m
+        varchar tramo
+        date fecha_instalacion
+    }
+    FUGA {
+        bigserial id PK
+        bigint sector_id FK
+        varchar ubicacion
+        enum severidad
+        enum estado
+        date fecha_reporte
+        date fecha_resolucion
+    }
+    MANTENIMIENTO {
+        bigserial id PK
+        bigint sector_id FK
+        varchar descripcion
+        enum tipo
+        date fecha_programada
+        date fecha_fin
+        enum estado
+    }
+    </pre>
+  </div>
+</div>
+
+<!-- 4. SECUENCIA: FACTURA -->
+<div class="page">
+  <h2>4. Diagrama de secuencia — Emisión de factura</h2>
+  <p class="desc">Flujo de generación de factura: lee consumos del período, aplica tarifas progresivas y persiste el documento.</p>
+  <div class="diagram-box">
+    <pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant CLI as Cliente HTTP
+    participant CTRL as FacturaController
+    participant FSVC as FacturaService
+    participant LSVC as LecturaService
+    participant TSVC as TarifaService
+    participant FJPA as FacturaRepository
+    participant DB as PostgreSQL
+
+    CLI->>CTRL: POST /api/facturas/generar<br/>{clienteId, periodo}
+    CTRL->>CTRL: Validar DTO (Jakarta)
+    CTRL->>FSVC: generarFactura(clienteId, periodo)
+    activate FSVC
+    FSVC->>LSVC: obtenerLecturasPeriodo(medidor, periodo)
+    activate LSVC
+    LSVC->>DB: SELECT lecturas del período
+    DB-->>LSVC: lista de lecturas
+    LSVC-->>FSVC: lecturas + consumo total (m3)
+    deactivate LSVC
+    FSVC->>TSVC: calcularImporte(consumo, fecha)
+    activate TSVC
+    TSVC->>DB: SELECT tarifas vigentes
+    DB-->>TSVC: tramos progresivos
+    TSVC-->>FSVC: cargoFijo + subtotal + total
+    deactivate TSVC
+    FSVC->>FSVC: arma objeto Factura (estado=PENDIENTE)
+    FSVC->>FJPA: save(factura)
+    FJPA->>DB: INSERT INTO factura
+    DB-->>FJPA: factura persistida
+    FJPA-->>FSVC: Factura
+    FSVC-->>CTRL: FacturaDTO
+    deactivate FSVC
+    CTRL-->>CLI: 201 Created + body
+    </pre>
+  </div>
+</div>
+
+<!-- 5. SECUENCIA: LECTURA Y PAGO -->
+<div class="page">
+  <h2>5. Diagramas de secuencia — Lectura y Pago</h2>
+
+  <h3>5.1 Registro de lectura con cálculo de consumo</h3>
+  <div class="diagram-box">
+    <pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant OPC as Operador / API
+    participant LC as LecturaController
+    participant LS as LecturaService
+    participant MR as MedidorRepository
+    participant LR as LecturaRepository
+    participant DB as PostgreSQL
+
+    OPC->>LC: POST /api/lecturas<br/>{medidorId, valor, fecha}
+    LC->>LS: registrar(dto)
+    activate LS
+    LS->>MR: findById(medidorId)
+    MR->>DB: SELECT medidor
+    DB-->>MR: medidor
+    LS->>LR: ultimaLectura(medidorId)
+    LR->>DB: SELECT ultima lectura
+    DB-->>LR: lectura anterior
+    LS->>LS: consumo = valor - anterior
+    alt consumo < 0
+        LS-->>LC: 409 Error relectura inválida
+    else consumo válido
+        LS->>LR: save(lectura)
+        LR->>DB: INSERT INTO lectura
+        DB-->>LR: OK
+        LS-->>LC: LecturaDTO con consumo
+    end
+    deactivate LS
+    LC-->>OPC: 201 Created
+    </pre>
+  </div>
+
+  <h3>5.2 Registro de pago y actualización de factura</h3>
+  <div class="diagram-box">
+    <pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant CAJ as Caja / API
+    participant PC as PagoController
+    participant PS as PagoService
+    participant FR as FacturaRepository
+    participant PR as PagoRepository
+    participant DB as PostgreSQL
+
+    CAJ->>PC: POST /api/pagos<br/>{facturaId, monto, metodo}
+    PC->>PS: pagar(dto)
+    activate PS
+    PS->>FR: findById(facturaId)
+    FR->>DB: SELECT factura
+    DB-->>FR: factura
+    PS->>PS: validar estado PENDIENTE/VENCIDA
+    PS->>PR: save(pago)
+    PR->>DB: INSERT INTO pago
+    DB-->>PR: pago
+    PS->>PR: sumPagos(facturaId)
+    PR->>DB: SELECT SUM(monto)
+    DB-->>PR: totalPagado
+    alt totalPagado >= factura.total
+        PS->>FR: factura.estado = PAGADA
+        FR->>DB: UPDATE factura
+    else parcial
+        PS->>PS: factura queda PENDIENTE
+    end
+    PS-->>PC: PagoDTO + estado factura
+    deactivate PS
+    PC-->>CAJ: 201 Created
+    </pre>
+  </div>
+</div>
+
+<!-- 6. DESPLIEGUE -->
+<div class="page">
+  <h2>6. Diagrama de despliegue</h2>
+  <p class="desc">Arquitectura de ejecución: aplicación Spring Boot empaquetada como JAR, conectada a PostgreSQL.</p>
+  <div class="diagram-box">
+    <pre class="mermaid">
+flowchart LR
+    subgraph CLIENTES
+        B["Navegador<br/>(Swagger UI / Front)"]
+        R["Cliente REST<br/>(Postman / App)"]
+    end
+    subgraph SERVIDOR["Servidor de aplicación"]
+        J["Spring Boot JAR<br/>Puerto 8080"]
+        subgraph INT["Internos"]
+            W["Spring Web / MVC"]
+            V["Bean Validation"]
+            A["@ControllerAdvice"]
+            O["Spring Data JPA"]
+        end
+        W --> V --> A --> O
+    end
+    subgraph DBS["Base de datos"]
+        P[("PostgreSQL 16<br/>Puerto 5432<br/>bd_servicio_agua")]
+    end
+    B -->|HTTP / JSON| J
+    R -->|HTTP / JSON| J
+    O -->|JDBC / Hibernate| P
+    style J fill:#0077b6,stroke:#023e8a,color:#fff
+    style P fill:#dbe9ff,stroke:#023e8a
+    style CLIENTES fill:#f8fbfd,stroke:#00b4d8
+    style SERVIDOR fill:#e8f8f5,stroke:#00b4d8
+    style DBS fill:#f4fafd,stroke:#0077b6
+    style INT fill:#fff,stroke:#aaa
+    </pre>
+  </div>
+</div>
+
+<!-- 7. MÓDULOS Y ENDPOINTS -->
+<div class="page">
+  <h2>7. Mapa de módulos y endpoints</h2>
+  <p class="desc">Vista general de la API REST bajo el prefijo <code>/api</code>.</p>
+  <div class="diagram-box">
+    <pre class="mermaid">
+flowchart TB
+    API["API REST /api"]
+    API --> M1["Clientes<br/>GET/POST /clientes<br/>GET/PUT/DELETE /clientes/{id}"]
+    API --> M2["Tomas<br/>GET/POST /tomas<br/>PUT /tomas/{id}/estado"]
+    API --> M3["Medidores<br/>GET/POST /medidores<br/>PUT /medidores/{id}/asignar"]
+    API --> M4["Lecturas<br/>POST /lecturas<br/>GET /lecturas?medidorId="]
+    API --> M5["Tarifas<br/>GET/POST /tarifas<br/>GET /tarifas/vigentes"]
+    API --> M6["Facturas<br/>POST /facturas/generar<br/>GET /facturas/{id}<br/>PUT /facturas/{id}/anular"]
+    API --> M7["Pagos<br/>POST /pagos<br/>GET /pagos?facturaId="]
+    API --> M8["Red<br/>/sectores /tuberias<br/>/fugas /mantenimientos"]
+    API --> M9["Reportes<br/>GET /reportes/consumo-por-sector<br/>GET /reportes/ventas-por-periodo<br/>GET /reportes/clientes-morosos<br/>GET /reportes/fugas-activas"]
+    style API fill:#0077b6,stroke:#023e8a,color:#fff
+    style M1 fill:#e3f2fb
+    style M2 fill:#e3f2fb
+    style M3 fill:#e3f2fb
+    style M4 fill:#e8f8f5
+    style M5 fill:#e8f8f5
+    style M6 fill:#fef9e7
+    style M7 fill:#fef9e7
+    style M8 fill:#fdecea
+    style M9 fill:#f3e8fd
+    </pre>
+  </div>
+
+  <h3>Reglas de negocio clave</h3>
+  <table>
+    <tr><th>#</th><th>Regla</th></tr>
+    <tr><td>1</td><td>Consumo = lectura actual − lectura anterior; si el resultado es negativo, se rechaza (relectura / anulación).</td></tr>
+    <tr><td>2</td><td>Facturación progresiva: el consumo se reparte por tramos de tarifa vigente a la fecha del período.</td></tr>
+    <tr><td>3</td><td>Solo un medidor activo por toma; al cambiar medidor se cierra el anterior con lectura de cierre.</td></tr>
+    <tr><td>4</td><td>Factura queda PAGADA cuando SUM(pagos) ≥ total; admite pagos parciales.</td></tr>
+    <tr><td>5</td><td>Facturas con vencimiento superado y sin pago total pasan a estado VENCIDA.</td></tr>
+    <tr><td>6</td><td>Una toma se da de baja solo si su medidor no tiene lecturas pendientes del período.</td></tr>
+  </table>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#e3f2fb',
+      primaryTextColor: '#1a1a2e',
+      primaryBorderColor: '#0077b6',
+      lineColor: '#023e8a',
+      secondaryColor: '#e8f8f5',
+      tertiaryColor: '#fef9e7',
+      fontFamily: 'Segoe UI, Arial, sans-serif',
+      fontSize: '14px'
+    },
+    er: { fontSize: 12, entityWidth: 180 },
+    flowchart: { curve: 'basis', padding: 12 }
+  });
+</script>
+</body>
+</html>
