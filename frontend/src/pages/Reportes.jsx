@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ChartLineUp, MapTrifold, Receipt, UsersThree, Warning } from '@phosphor-icons/react'
+import { ChartLineUp, DownloadSimple, MapTrifold, Receipt, UsersThree, Warning } from '@phosphor-icons/react'
 import { api } from '../api/client'
 import { formatDate, formatMoney, m3 } from '../lib/format'
 import {
@@ -169,7 +169,7 @@ export default function Reportes() {
                 seccion === 'consumo' ? consumo : ventas,
                 seccion === 'consumo'
                   ? [
-                      { key: 'sector', header: 'Sector' },
+                      { key: 'nombre', header: 'Sector' },
                       { key: 'consumoTotal', header: 'Consumo (m³)' },
                     ]
                   : [

@@ -70,7 +70,11 @@ public class FugaService {
 
     @Transactional
     public void delete(Long id) {
-        fugaRepository.delete(getFuga(id));
+        Fuga fuga = getFuga(id);
+        if (fuga.getEstado() == EstadoFuga.RESUELTA) {
+            throw new BusinessException("No se puede eliminar una fuga resuelta");
+        }
+        fugaRepository.delete(fuga);
     }
 
     @Transactional

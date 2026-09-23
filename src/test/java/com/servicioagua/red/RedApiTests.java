@@ -311,6 +311,23 @@ class RedApiTests {
     }
 
     @Test
+    void eliminarFugaResueltaDevuelve409() throws Exception {
+        Sector sector = crearSector();
+        Fuga fuga = fugaRepository.save(Fuga.builder()
+                .sector(sector)
+                .ubicacion("Calle Resuelta")
+                .severidad(SeveridadFuga.MEDIA)
+                .estado(EstadoFuga.RESUELTA)
+                .fechaReporte(LocalDate.now())
+                .fechaResolucion(LocalDate.now())
+                .build());
+
+        mockMvc.perform(delete("/api/fugas/{id}", fuga.getId()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
     void actualizarMantenimientoDevuelve200() throws Exception {
         Sector sector = crearSector();
         String mantId = mockMvc.perform(post("/api/mantenimientos")
@@ -342,6 +359,45 @@ class RedApiTests {
     }
 
     @Test
+    void actualizarMantenimientoConFechaPasadaDevuelve400() throws Exception {
+        Sector sector = crearSector();
+        Mantenimiento mantenimiento = mantenimientoRepository.save(Mantenimiento.builder()
+                .sector(sector)
+                .descripcion("Mantenimiento programado")
+                .tipo(TipoMantenimiento.PREVENTIVO)
+                .fechaProgramada(LocalDate.of(2030, 1, 1))
+                .estado(EstadoMantenimiento.PROGRAMADO)
+                .build());
+
+        mockMvc.perform(put("/api/mantenimientos/{id}", mantenimiento.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(MantenimientoRequest.builder()
+                                .sectorId(sector.getId())
+                                .descripcion("Reagendado al pasado")
+                                .tipo(TipoMantenimiento.PREVENTIVO)
+                                .fechaProgramada(LocalDate.of(2020, 1, 1))
+                                .build())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void actualizarMantenimientoInexistenteDevuelve404() throws Exception {
+        Sector sector = crearSector();
+
+        mockMvc.perform(put("/api/mantenimientos/{id}", 99999L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(MantenimientoRequest.builder()
+                                .sectorId(sector.getId())
+                                .descripcion("Inexistente")
+                                .tipo(TipoMantenimiento.PREVENTIVO)
+                                .fechaProgramada(LocalDate.of(2030, 1, 1))
+                                .build())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
     void actualizarMantenimientoNoProgramadoDevuelve409() throws Exception {
         Sector sector = crearSector();
         Mantenimiento mantenimiento = mantenimientoRepository.save(Mantenimiento.builder()
@@ -360,6 +416,61 @@ class RedApiTests {
                                 .tipo(TipoMantenimiento.PREVENTIVO)
                                 .fechaProgramada(LocalDate.of(2030, 2, 1))
                                 .build())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void actualizarFugaConSectorInexistenteDevuelve404() throws Exception {
+        long fugaId = crearFugaPorApi(crearSector());
+
+        mockMvc.perform(put("/api/fugas/{id}", fugaId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(FugaRequest.builder()
+                                .sectorId(999999L)
+                                .ubicacion("Con sector inexistente")
+                                .severidad(SeveridadFuga.ALTA)
+                                .build())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void actualizarMantenimientoConSectorInexistenteDevuelve404() throws Exception {
+        Sector sector = crearSector();
+        Mantenimiento mantenimiento = mantenimientoRepository.save(Mantenimiento.builder()
+                .sector(sector)
+                .descripcion("Mantenimiento programado")
+                .tipo(TipoMantenimiento.PREVENTIVO)
+                .fechaProgramada(LocalDate.of(2030, 1, 1))
+                .estado(EstadoMantenimiento.PROGRAMADO)
+                .build());
+
+        mockMvc.perform(put("/api/mantenimientos/{id}", mantenimiento.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(MantenimientoRequest.builder()
+                                .sectorId(999999L)
+                                .descripcion("Con sector inexistente")
+                                .tipo(TipoMantenimiento.PREVENTIVO)
+                                .fechaProgramada(LocalDate.of(2030, 2, 1))
+                                .build())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void eliminarMantenimientoNoProgramadoDevuelve409() throws Exception {
+        Sector sector = crearSector();
+        Mantenimiento mantenimiento = mantenimientoRepository.save(Mantenimiento.builder()
+                .sector(sector)
+                .descripcion("Mantenimiento completado")
+                .tipo(TipoMantenimiento.PREVENTIVO)
+                .fechaProgramada(LocalDate.of(2030, 1, 1))
+                .fechaFin(LocalDate.of(2030, 1, 2))
+                .estado(EstadoMantenimiento.COMPLETADO)
+                .build());
+
+        mockMvc.perform(delete("/api/mantenimientos/{id}", mantenimiento.getId()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.success").value(false));
     }

@@ -60,6 +60,9 @@ public class MantenimientoService {
     @Transactional
     public MantenimientoResponse update(Long id, MantenimientoRequest request) {
         Mantenimiento mantenimiento = getMantenimiento(id);
+        if (request.getFechaProgramada().isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException("La fecha programada no puede ser en el pasado");
+        }
         if (mantenimiento.getEstado() != EstadoMantenimiento.PROGRAMADO) {
             throw new BusinessException("Solo se puede editar un mantenimiento programado");
         }
@@ -73,7 +76,11 @@ public class MantenimientoService {
 
     @Transactional
     public void delete(Long id) {
-        mantenimientoRepository.delete(getMantenimiento(id));
+        Mantenimiento mantenimiento = getMantenimiento(id);
+        if (mantenimiento.getEstado() != EstadoMantenimiento.PROGRAMADO) {
+            throw new BusinessException("Solo se puede eliminar un mantenimiento programado");
+        }
+        mantenimientoRepository.delete(mantenimiento);
     }
 
     @Transactional

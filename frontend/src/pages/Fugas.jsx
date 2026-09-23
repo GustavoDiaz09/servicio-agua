@@ -133,7 +133,7 @@ export default function Fugas() {
     if (!deleteTarget) return
     setDeleting(true)
     try {
-      await api.delete(`/fugas/${deleteTarget.id}`)
+      await api.del(`/fugas/${deleteTarget.id}`)
       setDeleteTarget(null)
       load()
     } catch (err) {
@@ -207,28 +207,32 @@ export default function Fugas() {
               Resolver
             </Button>
           )}
-          <Button
-            variant="ghost"
-            className="!px-2.5"
-            onClick={(e) => {
-              e.stopPropagation()
-              openEdit(r)
-            }}
-            aria-label={`Editar fuga ${r.id}`}
-          >
-            <PencilSimple size={16} weight="bold" />
-          </Button>
-          <Button
-            variant="ghost"
-            className="!px-2.5 !text-red-600 hover:!bg-red-50 dark:!text-red-400 dark:hover:!bg-red-500/10"
-            onClick={(e) => {
-              e.stopPropagation()
-              setDeleteTarget(r)
-            }}
-            aria-label={`Eliminar fuga ${r.id}`}
-          >
-            <Trash size={16} weight="bold" />
-          </Button>
+          {r.estado !== 'RESUELTA' && (
+            <>
+              <Button
+                variant="ghost"
+                className="!px-2.5"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  openEdit(r)
+                }}
+                aria-label={`Editar fuga ${r.id}`}
+              >
+                <PencilSimple size={16} weight="bold" />
+              </Button>
+              <Button
+                variant="ghost"
+                className="!px-2.5 !text-red-600 hover:!bg-red-50 dark:!text-red-400 dark:hover:!bg-red-500/10"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setDeleteTarget(r)
+                }}
+                aria-label={`Eliminar fuga ${r.id}`}
+              >
+                <Trash size={16} weight="bold" />
+              </Button>
+            </>
+          )}
         </div>
       ),
     },

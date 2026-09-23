@@ -149,7 +149,7 @@ export default function Mantenimientos() {
     if (!deleteTarget) return
     setDeleting(true)
     try {
-      await api.delete(`/mantenimientos/${deleteTarget.id}`)
+      await api.del(`/mantenimientos/${deleteTarget.id}`)
       setDeleteTarget(null)
       load()
     } catch (e) {
@@ -188,17 +188,26 @@ export default function Mantenimientos() {
       align: 'right',
       render: (r) => (
         <div className="flex justify-end gap-1">
-          <Button variant="ghost" className="!px-2.5" onClick={() => openEdit(r)} aria-label={`Editar mantenimiento ${r.id}`}>
-            <PencilSimple size={16} weight="bold" />
-          </Button>
-          <Button
-            variant="ghost"
-            className="!px-2.5 !text-red-600 hover:!bg-red-50 dark:!text-red-400 dark:hover:!bg-red-500/10"
-            onClick={() => setDeleteTarget(r)}
-            aria-label={`Eliminar mantenimiento ${r.id}`}
-          >
-            <Trash size={16} weight="bold" />
-          </Button>
+          {r.estado === 'PROGRAMADO' && (
+            <>
+              <Button
+                variant="ghost"
+                className="!px-2.5"
+                onClick={() => openEdit(r)}
+                aria-label={`Editar mantenimiento ${r.id}`}
+              >
+                <PencilSimple size={16} weight="bold" />
+              </Button>
+              <Button
+                variant="ghost"
+                className="!px-2.5 !text-red-600 hover:!bg-red-50 dark:!text-red-400 dark:hover:!bg-red-500/10"
+                onClick={() => setDeleteTarget(r)}
+                aria-label={`Eliminar mantenimiento ${r.id}`}
+              >
+                <Trash size={16} weight="bold" />
+              </Button>
+            </>
+          )}
           {r.estado === 'PROGRAMADO' && (
             <>
               <Button variant="ghost" className="!px-2.5" onClick={() => setActionTarget({ ...r, next: 'EN_CURSO' })}>
