@@ -87,14 +87,11 @@ Cada agente trabaja **solo** dentro de su paquete. Un método nuevo en el reposi
 
 ## Estado para continuar — Red (Agente E)
 
-Verificado hoy compilando y testeando desde cero (`git worktree` + `mvnw -q clean compile`):
-- **`HEAD` (`7aef6c9`) compila todo en verde.** El "bloqueo ajeno" que se registró antes (falta de getters en `factura/`/`lectura/`) era **un diagnóstico erróneo**: esas entidades/DTOs **sí** tienen los campos (`Factura.total/periodoDesde/periodoHasta/vencimiento/estado`, `LecturaRequest.medidorId`). No había que arreglar nada ahí.
-- El build en rojo hoy lo causa **solo el trabajo sin commitear de `red/`** (ver `git status`). Corregidos los 2 puntos de abajo, todo el proyecto limpio compila.
-
-**Trabajo en curso de `red/` que todavía NO compila (sin commitear):**
-- `FugaService.java`: `update(Long, FugaRequest)` y `delete(Long)` están **definidos dos veces** → `method update/delete is already defined`.
-- `MantenimientoService.java`: `update()` llama a un helper inexistente `getSector(Long)`; `delete()` tiene typo `mantenerimientoRepository` (falta la `n` de `mantenimiento`).
-- Frontend `Fugas.jsx` / `Mantenimientos.jsx` / `Reportes.jsx` (editar/eliminar + Exportar CSV): `npm run build` en verde ✓.
+**Cerrado el 2026-09-23 en `e077e42`** (verificado con `mvnw -q clean package` y `npm run build`):
+- `red/` CRUD completo: Fugas y Mantenimientos con `PUT`/`DELETE` (controllers + services). Fuga editable salvo `RESUELTA` (409); Mantenimiento editable solo en `PROGRAMADO` (409); los updates resuelven el sector con `sectorRepository.findById(...).orElseThrow(...)`.
+- `RedApiTests` ampliado a 18 tests (update/delete de fuga y mantenimiento, 404/409). Suite completa: 77 tests verdes.
+- Frontend: `Fugas.jsx` y `Mantenimientos.jsx` con editar/eliminar (`PUT`/`DELETE`); `Reportes.jsx` con helpers `escCSV`/`exportarCSV` y botón **Exportar CSV**.
+- El "bloqueo" previo de `factura/`/`lectura/` era diagnóstico erróneo: esas entidades/DTOs **sí** tienen los campos (`Factura.total/periodoDesde/periodoHasta/vencimiento/estado`, `LecturaRequest.medidorId`); `HEAD` siempre compiló verde.
 
 **Gotcha: aluvión de "cannot find symbol" por Lombok.** Con `clean compile`, cualquier error **real** de javac en un archivo (p. ej. método duplicado, typo) hace que se descarte la generación de Lombok para toda la compilación → lluvia de `cannot find symbol` de getters/setters/`builder()` por casi todos los módulos (`cliente`, `factura`, `lectura`, …). NO son errores reales: los getters existen (Lombok `@Data`). Hay que buscar el **primer** error que no sea de Lombok (suele estar en el archivo que se está editando) y, al arreglarlo, la lluvia desaparece sola.
 
