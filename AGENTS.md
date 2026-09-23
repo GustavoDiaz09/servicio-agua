@@ -76,7 +76,7 @@ Cada agente trabaja **solo** dentro de su paquete. Un método nuevo en el reposi
 - La mayoría desactiva el seed con `@SpringBootTest(properties = "app.seed.enabled=false")` y arma sus propios datos; `src/test/resources/application.yml` lo deja activo por defecto.
 - Al cambiar reglas de negocio: actualizar/ampliar el `*ApiTests` del módulo. Correr uno solo: `.\mvnw.cmd -q test "-Dtest=ClienteApiTests"`.
 - CI (`.github/workflows/ci.yml`) corre `./mvnw -B -ntp clean package` en `main`/PRs: el proyecto entero debe compilar y pasar tests, no solo el módulo tocado.
-- `docs/auditoria.md` y `docs/auditoria-ciclo2.md` registran hallazgos/requisitos de ciclos previos: consultarlos antes de tocar reglas de negocio existentes.
+- `docs/auditoria.md`, `docs/auditoria-ciclo2.md` y `docs/auditoria-ciclo5.md` registran hallazgos/requisitos de ciclos previos: consultarlos antes de tocar reglas de negocio existentes. El ciclo 5 agregó el handler `NoResourceFoundException` → 404 en `common/` (autorizado por el orquestador).
 
 ## Criterios de "hecho"
 
