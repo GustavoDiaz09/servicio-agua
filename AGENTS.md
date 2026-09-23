@@ -21,6 +21,8 @@ Maven **no** está en el PATH global. Usar siempre el wrapper desde la raíz:
 
 Arranque dev: requiere base PostgreSQL `bd_servicio_agua` ya creada; credenciales vía `DB_URL`/`DB_USER`/`DB_PASSWORD` (defaults `localhost:5432`, `postgres`/`postgres`). Dev usa `ddl-auto: update` (Hibernate genera el esquema, sin migraciones SQL).
 
+PostgreSQL **local** (este equipo): la instalación de Windows (`Program Files`) está rota/sin binarios; se usa un **cluster portable PG 17.11** en `%LOCALAPPDATA%\PostgreSQL\pgsql\bin` (datos en `%LOCALAPPDATA%\PostgreSQL\pgdata`, superuser `postgres`/`postgres`, puerto 5432). No es un servicio de Windows: arrancar con `pg_ctl -D <pgdata> -l <log> start` (o `pg_ctl stop`) antes/después de usar el backend. No "reparar" la instalación de `Program Files`.
+
 ```powershell
 .\mvnw.cmd spring-boot:run     # API en http://localhost:8080 (Swagger en /swagger-ui.html, sin auth)
 ```
