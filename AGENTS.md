@@ -2,95 +2,83 @@
 
 Guía para agentes que trabajen en el **Sistema de Gestión de Agua Potable**.
 
-## Visión general
+## Stack y arquitectura
 
-- Stack: Java 17 · Spring Boot 3.3.x · Spring Web · Spring Data JPA · PostgreSQL · Maven.
-- Arquitectura por capas: `Controller → Service → Repository → Entity`, empaquetado por **módulo** (cliente, toma, medidor, lectura, tarifa, factura, pago, red, reporte).
-- El dominio completo (entidades, repositorios, enums, manejo de errores, config) ya está consolidado en la fase 0. **No lo modifiques sin autorización del agente coordinador.**
-- Lombok disponible: usá `@Data`, `@Builder`, `@NoArgsConstructor`, `@AllArgsConstructor` en DTO/entidades.
+- Java 17 · Spring Boot 3.3.5 · Spring Web · Spring Data JPA · PostgreSQL · Maven (wrapper).
+- Capas `Controller → Service → Repository → Entity`, empaquetado por módulo bajo `com.servicioagua` (`src/main/java/com/servicioagua/`).
+- **Estado actual: backend completo** (entidades, repos, services, controllers, DTOs, `DataSeeder`, tests de API, CI). `common/`, entidades y repositorios están consolidados: **no modificarlos sin coordinación**.
+- DTO/entidades usan Lombok (`@Data`, `@Builder`, `@NoArgsConstructor`, `@AllArgsConstructor`).
 
-## Comandos
+## Comandos — backend
 
-Maven no está en el PATH global. Usá **siempre** el wrapper:
+Maven **no** está en el PATH global. Usar siempre el wrapper desde la raíz:
 
 ```powershell
-.\mvnw.cmd -q compile          # compilar
-.\mvnw.cmd -q package          # empaquetar (con tests)
-.\mvnw.cmd -q clean package    # limpieza + empaquetado
+.\mvnw.cmd -q compile          # compilar (verificación rápida)
+.\mvnw.cmd -q test             # tests de API: MockMvc + H2 (sin necesidad de PostgreSQL)
+.\mvnw.cmd -q clean package    # build completo (es lo que corre la CI)
 ```
 
-Fallback (sin wrapper): `& "C:\Program Files\NetBeans-24\netbeans\java\maven\bin\mvn.cmd" ...`.
+Arranque dev: requiere base PostgreSQL `bd_servicio_agua` ya creada; credenciales vía `DB_URL`/`DB_USER`/`DB_PASSWORD` (defaults `localhost:5432`, `postgres`/`postgres`). Dev usa `ddl-auto: update` (Hibernate genera el esquema, sin migraciones SQL).
 
-Arranque local en dev usa `ddl-auto: update` (PostgreSQL vía `DB_URL`/`DB_USER`/`DB_PASSWORD`).
+```powershell
+.\mvnw.cmd spring-boot:run     # API en http://localhost:8080 (Swagger en /swagger-ui.html, sin auth)
+```
+
+`DataSeeder` (`common/config/`) carga datos demo si `app.seed.enabled=true` (default): `.\mvnw.cmd spring-boot:run -Dspring-boot.run.arguments=--app.seed.enabled=false`.
+
+**Dev rápido sin PostgreSQL** (H2 en memoria, mismo `application.yml` de tests vía classpath de test; datos no persistidos):
+
+```powershell
+.\mvnw.cmd spring-boot:test-run   # API en http://localhost:8080 con datos demo
+```
+
+## Frontend (fuera del build Maven)
+
+- `frontend/`: React 19 + Vite 6 + Tailwind 4. No lo compila Maven ni lo toca la CI.
+- `npm run dev` desde `frontend/` (ejecutar con `npm.cmd` si PowerShell bloquea `npm.ps1`) → `http://localhost:5173`. Si el puerto está ocupado, Vite usa `5174`/`5175…`.
+- Proxy de Vite: `/api` → `http://localhost:8080`. Error `[vite] http proxy error ... ECONNREFUSED` en la terminal = **el backend no está corriendo** (8080 cerrado), no es un bug del frontend.
+- Páginas implementadas (rutas en `App.jsx`): Dashboard, Clientes, Tomas, Medidores, Lecturas, Tarifas, Facturas, Pagos, Red (Sectores/Tuberias/Fugas/Mantenimientos), Reportes.
+- Patrones reutilizados: `api` de `src/api/client.js` (`payload.data`), `formatMoney/formatDate/m3` en `lib/format.js`, componentes de `components/ui.jsx` (`DataTable`, `Modal`, `ConfirmDialog`, `Badge`, `estadoTone`, `StatCard`, `EmptyState`, `Field`, `inputCls`, `Button`).
+- Tras modificar frontend, verificar con `npm run build` (desde `frontend/`).
 
 ## Estándares de código (obligatorios)
 
-1. **Ruta base:** `src/main/java/com/servicioagua/`, paquete root `com.servicioagua`.
-2. Un módulo = un paquete con: `Xxx.java` (entity, ya existe), `XxxRepository.java` (ya existe), `XxxService.java`, `XxxController.java`, DTOs (`XxxRequest` / `XxxResponse` dentro del paquete o subpaquete `dto`).
-3. DTOs con Jakarta Validation (`@NotBlank`, `@NotNull`, `@Min`, `@Email`, `@DecimalMin`).
-4. Respuestas uniformes: envolver en `ApiResponse<T>` — `ApiResponse.ok(data)` / `ApiResponse.ok(msg,data)`. Controladores devuelven `ResponseEntity<ApiResponse<...>>`.
-5. Errores: lanzar `BusinessException` (negocio/conflicto → 409), `ResourceNotFoundException` (→ 404), `IllegalArgumentException` (→ 400). **No** atrapar duplicados con try/catch local; usar el validador `existsBy...` del repositorio y lanzar `DuplicateResourceException`.
-6. Endpoints bajo `/api/*`. NO agregar control handlers de excepciones por módulo (ya está `GlobalExceptionHandler`).
-7. `@Service` en clases de servicio (sin interfaz). `@Transactional` en operaciones de escritura.
-8. Fechas: `LocalDate`. Dinero: `BigDecimal` (nunca double). Consumo: `Integer`.
-9. Identificadores de entidad: `Long`. NO crear nuevas migraciones SQL (Hibernate genera el esquema).
-10. No agregar dependencias al `pom.xml` sin permiso del coordinador.
-11. Sin comentarios explicativos en el código (salvo Javadoc de nivel de clase cuando aporte).
-12. Idioma: nombres de clases/métodos/columnas en inglés; mensajes al usuario (excepciones, DTO messages) en español.
+1. Un módulo = paquete `com.servicioagua.<modulo>` con `XxxService`, `XxxController` y DTOs (`dto/`). La entidad y el repo ya existen.
+2. DTOs con Jakarta Validation (`@NotBlank`, `@NotNull`, `@Min`, `@Email`, `@DecimalMin`).
+3. Respuestas uniformes: `ApiResponse<T>` (`ApiResponse.ok(data)` / `ApiResponse.ok(msg, data)`); controllers devuelven `ResponseEntity<ApiResponse<...>>`.
+4. Errores: `BusinessException` → 409, `DuplicateResourceException` → 409 (validar con `existsBy...` del repo, **no** try/catch de duplicados), `ResourceNotFoundException` → 404, `IllegalArgumentException` → 400. No agregar `@ExceptionHandler` por módulo: `GlobalExceptionHandler` (en `common`) cubre todo.
+5. `@Service` sin interfaz; `@Transactional` en escrituras, `readOnly = true` en lecturas.
+6. Endpoints bajo `/api/*`. Reglas de negocio en el Service, nunca en el Controller.
+7. Tipos: `LocalDate` (fechas), `BigDecimal` (dinero), `Integer` (consumo), `Long` (ids). Sin migraciones SQL (Hibernate genera el esquema).
+8. Nombres/métodos/columnas en inglés; mensajes al usuario (excepciones, validación) en español. Sin comentarios explicativos.
+9. No agregar dependencias al `pom.xml`, no tocar `common/`, entidades ni repos de otros módulos sin autorización.
 
-## Mapa de propiedad de archivos (evita conflictos)
+## Mapa de propiedad (frontera de escritura)
 
-| Módulo (paquete) | Archivos | Dueño |
+| Paquete | Servicios/Cotrollers/DTOs | Dueño |
 |---|---|---|
-| `common/` | enums, excepciones, `ApiResponse`, config | coordinador (fase 0) |
-| dominios completos | entidades + repos de todos los módulos | coordinador (fase 0) |
-| `cliente/` | `ClienteService`, `ClienteController`, DTOs | Agente A |
+| `cliente/` | `ClienteService/Controller`, DTOs | Agente A |
 | `toma/` + `medidor/` | services, controllers, DTOs (medidor↔toma) | Agente B |
-| `lectura/` + `tarifa/` | services, controllers, DTOs (cálculo consumo + tarifa progresiva) | Agente C |
+| `lectura/` + `tarifa/` | services, controllers, DTOs (consumo + tarifa progresiva) | Agente C |
 | `factura/` + `pago/` | services, controllers, DTOs (facturación, pagos, estados) | Agente D |
-| `red/` | `SectorService/Controller`, `Tuberia/…`, `Fuga/…`, `Mantenimiento/…` + DTOs | Agente E |
-| `reporte/` | `ReporteController`, projections/DTOs de agregación | Agente F |
+| `red/` | `Sector`/`Tuberia`/`Fuga`/`Mantenimiento` + DTOs | Agente E |
+| `reporte/` | `ReporteController/Service`, projections/DTOs | Agente F |
+| `common/` + entidades + repos | consolidados fase 0 | coordinador |
 
-**Regla de oro:** cada agente escribe EXCLUSIVAMENTE dentro de su paquete. Si necesita un método adicional en un repositorio de su módulo, puede agregarlo (está en su paquete). Nunca tocar archivos de otros módulos ni `common/`.
+Cada agente trabaja **solo** dentro de su paquete. Un método nuevo en el repositorio de su módulo puede agregarlo; nada fuera de ese paquete.
 
-## Plan de orquestación con agentes paralelos
+## Tests
 
-Ejecutar en **dos fases** para evitar conflictos:
-
-### Fase A — Fundación (coordinador, serie)
-1. `pom.xml`, `application.yml`, clase principal, `.gitignore`, wrapper de Maven.
-2. `common/`: enums, excepciones, `ApiResponse`, `OpenApiConfig`, `WebConfig`.
-3. Entidades y repositorios de los 11 dominios (compila sin lógica de negocio).
-4. **Verificación:** `.\mvnw.cmd -q compile` → debe pasar.
-
-### Fase B — Módulos (agentes paralelos, simultáneos)
-Lanzar en paralelo un agente `general` por módulo con este brief común:
-
-- Contexto: proyecto Spring Boot en `C:\Users\gusta\Documents\proyectos serios\Servicio del agua`.
-- Tarea: crear Service, Controller y DTOs SOLO en `com.servicioagua.<tu_proyecto>`.
-- Entidades y repos ya existen (leerlas primero). Reutilizar `common/` (ApiResponse, excepciones).
-- No modificar `pom.xml`, entidades ajenas, `common/`, ni archivos de otros paquetes.
-- Verificación local: compilar TODO el proyecto con `mvnw.cmd -q compile` (no fallar compilación general).
-- Reportar: archivos creados, endpoints expuestos, reglas de negocio implementadas y cualquier dependencia cruzada detectada.
-
-Orden funcional de entrega (los agentes pueden correr a la vez; la integración es al final):
-
-1. **Agente A — cliente:** CRUD Cliente (crear, listar, buscar por id/documento, actualizar, cambiar estado). `GET/POST /api/clientes`, `GET/PUT/DELETE /api/clientes/{id}`.
-2. **Agente B — toma + medidor:** CRUD Toma (crear con cliente+sector, listar por cliente/sector, dar de baja solo si no hay lecturas pendientes). CRUD Medidor (alta por serie única, asignar a toma verificando un solo activo por toma, retirar medidor). Endpoints `/api/tomas/*`, `/api/medidores/*`.
-3. **Agente C — lectura + tarifa:** CRUD Tarifa (tramos con vigencia). Registro de Lectura con cálculo `consumo = valorActual − valorAnterior`; rechazo si consumo < 0 (BusinessException). Historial por medidor. Endpoints `/api/tarifas/*`, `/api/lecturas/*`.
-4. **Agente D — factura + pago:** generar factura por cliente+periodo usando lecturas del periodo y tarifas vigentes (progresivo por tramo + cargoFijo). Anular. Registrar pago (total/parcial) y pasar factura a PAGADA/PARCIAL. Endpoints `/api/facturas/*`, `/api/pagos/*`.
-5. **Agente E — red:** CRUD Sector, Tubería, Fuga (con estados reportada/curso/resuelta) y Mantenimiento (preventivo/correctivo, estados). Endpoints `/api/sectores`, `/api/tuberias`, `/api/fugas`, `/api/mantenimientos`.
-6. **Agente F — reportes:** consultas de agregación: consumo por sector, ventas por periodo, clientes morosos, fugas activas. Endpoints `/api/reportes/*`. Usa JPQL sobre los repositorios existentes (proyecciones/interfaces o DTO).
-
-### Fase C — Integración (coordinador, serie)
-1. Resolver conflictos de compilación/imports.
-2. `DataSeeder` (componente `CommandLineRunner`) con datos de demo: sectores, tarifas, clientes, tomas, medidores, lecturas.
-3. `mvnw.cmd -q clean package` completo (verde).
-4. Revisión de advisors de seguridad si aplica y README.
+- `src/test/java/com/servicioagua/<modulo>/*ApiTests.java`: `@SpringBootTest` + `MockMvc` + H2 (`MODE=PostgreSQL`) + `@Transactional`. No requieren PostgreSQL.
+- La mayoría desactiva el seed con `@SpringBootTest(properties = "app.seed.enabled=false")` y arma sus propios datos; `src/test/resources/application.yml` lo deja activo por defecto.
+- Al cambiar reglas de negocio: actualizar/ampliar el `*ApiTests` del módulo. Correr uno solo: `.\mvnw.cmd -q test "-Dtest=ClienteApiTests"`.
+- CI (`.github/workflows/ci.yml`) corre `./mvnw -B -ntp clean package` en `main`/PRs: el proyecto entero debe compilar y pasar tests, no solo el módulo tocado.
+- `docs/auditoria.md` y `docs/auditoria-ciclo2.md` registran hallazgos/requisitos de ciclos previos: consultarlos antes de tocar reglas de negocio existentes.
 
 ## Criterios de "hecho"
 
-- Compila `.\mvnw.cmd -q compile` sin errores desde la raíz del módulo.
-- Endpoints devuelven `ApiResponse<T>` con códigos HTTP correctos (200/201/400/404/409).
-- Reglas de negocio del módulo implementadas en Service (no en Controller).
-- No hay duplicación de código ni importaciones sin usar (`mvnw.cmd -q compile` no emite warnings bloqueantes).
+- `.\mvnw.cmd -q compile` sin errores desde la raíz.
+- Tests del módulo en verde; sin imports sin usar ni duplicación de código.
+- `ApiResponse<T>` con códigos HTTP correctos (200/201/400/404/409).
+- Reglas de negocio en Service (no en Controller).
