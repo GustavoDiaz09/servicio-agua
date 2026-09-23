@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import {
   ArrowRight,
   CheckCircle,
+  PencilSimple,
   Plus,
+  Trash,
   Warning,
 } from '@phosphor-icons/react'
 import { api } from '../api/client'
@@ -48,9 +50,13 @@ export default function Fugas() {
   const [loadError, setLoadError] = useState(null)
 
   const [formOpen, setFormOpen] = useState(false)
+  const [editing, setEditing] = useState(null)
   const [form, setForm] = useState({})
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
+
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
 
   const [actionTarget, setActionTarget] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -74,7 +80,19 @@ export default function Fugas() {
   }, [])
 
   function openCreate() {
+    setEditing(null)
     setForm({ sectorId: sectores[0]?.id ?? '', ubicacion: '', severidad: 'BAJA' })
+    setSaveError(null)
+    setFormOpen(true)
+  }
+
+  function openEdit(r) {
+    setEditing(r)
+    setForm({
+      sectorId: r.sectorId,
+      ubicacion: r.ubicacion,
+      severidad: r.severidad,
+    })
     setSaveError(null)
     setFormOpen(true)
   }
@@ -92,17 +110,37 @@ export default function Fugas() {
     setSaving(true)
     setSaveError(null)
     try {
-      await api.post('/fugas', {
+      const payload = {
         sectorId: Number(form.sectorId),
         ubicacion: form.ubicacion.trim(),
         severidad: form.severidad,
-      })
+      }
+      if (editing) {
+        await api.put(`/fugas/${editing.id}`, payload)
+      } else {
+        await api.post('/fugas', payload)
+      }
       setFormOpen(false)
       load()
     } catch (err) {
       setSaveError(err.message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await api.delete(`/fugas/${deleteTarget.id}`)
+      setDeleteTarget(null)
+      load()
+    } catch (err) {
+      setLoadError(err.message)
+      setDeleteTarget(null)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -169,6 +207,28 @@ export default function Fugas() {
               Resolver
             </Button>
           )}
+          <Button
+            variant="ghost"
+            className="!px-2.5"
+            onClick={(e) => {
+              e.stopPropagation()
+              openEdit(r)
+            }}
+            aria-label={`Editar fuga ${r.id}`}
+          >
+            <PencilSimple size={16} weight="bold" />
+          </Button>
+          <Button
+            variant="ghost"
+            className="!px-2.5 !text-red-600 hover:!bg-red-50 dark:!text-red-400 dark:hover:!bg-red-500/10"
+            onClick={(e) => {
+              e.stopPropagation()
+              setDeleteTarget(r)
+            }}
+            aria-label={`Eliminar fuga ${r.id}`}
+          >
+            <Trash size={16} weight="bold" />
+          </Button>
         </div>
       ),
     },
@@ -209,7 +269,7 @@ export default function Fugas() {
       <Modal
         open={formOpen}
         onClose={() => setFormOpen(false)}
-        title="Reportar fuga"
+        title={editing ? 'Editar fuga' : 'Reportar fuga'}
         footer={
           <>
             <Button variant="secondary" onClick={() => setFormOpen(false)} disabled={saving}>
@@ -217,7 +277,7 @@ export default function Fugas() {
             </Button>
             <Button type="submit" form="fuga-form" disabled={saving}>
               {saving ? <Spinner size={14} /> : null}
-              {saving ? 'Guardando…' : 'Reportar fuga'}
+              {saving ? 'Guardando…' : editing ? 'Guardar cambios' : 'Reportar fuga'}
             </Button>
           </>
         }
@@ -275,6 +335,20 @@ export default function Fugas() {
         title={actionTarget?.action === 'resolver' ? 'Resolver fuga' : 'Fuga en curso'}
         confirmLabel={actionTarget?.action === 'resolver' ? 'Resolver' : 'En curso'}
         message={actionMessage}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        busy={deleting}
+        title="Eliminar fuga"
+        confirmLabel="Eliminar"
+        message={
+          deleteTarget
+            ? `¿Eliminar la fuga en "${deleteTarget.ubicacion}"? Esta acción no se puede deshacer.`
+            : ''
+        }
       />
     </div>
   )

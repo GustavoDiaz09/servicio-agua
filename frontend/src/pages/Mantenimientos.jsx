@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import {
   ArrowRight,
   CheckCircle,
+  PencilSimple,
   Plus,
+  Trash,
   Wrench,
   XCircle,
 } from '@phosphor-icons/react'
@@ -41,12 +43,16 @@ export default function Mantenimientos() {
   const [loadError, setLoadError] = useState(null)
 
   const [formOpen, setFormOpen] = useState(false)
+  const [editing, setEditing] = useState(null)
   const [form, setForm] = useState({})
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
 
   const [actionTarget, setActionTarget] = useState(null)
   const [busy, setBusy] = useState(false)
+
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -67,7 +73,20 @@ export default function Mantenimientos() {
   }, [])
 
   function openCreate() {
+    setEditing(null)
     setForm({ sectorId: sectores[0]?.id ?? '', tipo: 'PREVENTIVO', descripcion: '', fechaProgramada: '' })
+    setSaveError(null)
+    setFormOpen(true)
+  }
+
+  function openEdit(r) {
+    setEditing(r)
+    setForm({
+      sectorId: r.sectorId ?? '',
+      tipo: r.tipo || 'PREVENTIVO',
+      descripcion: r.descripcion || '',
+      fechaProgramada: r.fechaProgramada || '',
+    })
     setSaveError(null)
     setFormOpen(true)
   }
@@ -89,12 +108,17 @@ export default function Mantenimientos() {
     setSaving(true)
     setSaveError(null)
     try {
-      await api.post('/mantenimientos', {
+      const payload = {
         sectorId: Number(form.sectorId),
         descripcion: form.descripcion.trim(),
         tipo: form.tipo,
         fechaProgramada: form.fechaProgramada,
-      })
+      }
+      if (editing) {
+        await api.put(`/mantenimientos/${editing.id}`, payload)
+      } else {
+        await api.post('/mantenimientos', payload)
+      }
       setFormOpen(false)
       load()
     } catch (err) {
@@ -121,7 +145,20 @@ export default function Mantenimientos() {
     }
   }
 
-  const today = new Date().toISOString().slice(0, 10)
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await api.delete(`/mantenimientos/${deleteTarget.id}`)
+      setDeleteTarget(null)
+      load()
+    } catch (e) {
+      setLoadError(e.message)
+      setDeleteTarget(null)
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   const columns = [
     { key: 'id', header: 'ID', className: 'w-16' },
@@ -151,6 +188,17 @@ export default function Mantenimientos() {
       align: 'right',
       render: (r) => (
         <div className="flex justify-end gap-1">
+          <Button variant="ghost" className="!px-2.5" onClick={() => openEdit(r)} aria-label={`Editar mantenimiento ${r.id}`}>
+            <PencilSimple size={16} weight="bold" />
+          </Button>
+          <Button
+            variant="ghost"
+            className="!px-2.5 !text-red-600 hover:!bg-red-50 dark:!text-red-400 dark:hover:!bg-red-500/10"
+            onClick={() => setDeleteTarget(r)}
+            aria-label={`Eliminar mantenimiento ${r.id}`}
+          >
+            <Trash size={16} weight="bold" />
+          </Button>
           {r.estado === 'PROGRAMADO' && (
             <>
               <Button variant="ghost" className="!px-2.5" onClick={() => setActionTarget({ ...r, next: 'EN_CURSO' })}>
@@ -184,17 +232,10 @@ export default function Mantenimientos() {
 
   const actionLabel =
     actionTarget?.next === 'EN_CURSO'
-      ? 'Iniciar mantenimiento'
+      ? 'Iniciar'
       : actionTarget?.next === 'COMPLETADO'
-        ? 'Completar mantenimiento'
-        : 'Cancelar mantenimiento'
-
-  const actionMessage =
-    actionTarget?.next === 'EN_CURSO'
-      ? `¿Iniciar el mantenimiento "${actionTarget.descripcion}" en el sector "${actionTarget.sectorNombre}"?`
-      : actionTarget?.next === 'COMPLETADO'
-        ? `¿Marcar como completado el mantenimiento "${actionTarget.descripcion}"?`
-        : `¿Cancelar el mantenimiento "${actionTarget?.descripcion}"? Esta acción no se puede deshacer.`
+        ? 'Completar'
+        : 'Cancelar'
 
   return (
     <div>
@@ -226,7 +267,7 @@ export default function Mantenimientos() {
       <Modal
         open={formOpen}
         onClose={() => setFormOpen(false)}
-        title="Nuevo mantenimiento"
+        title={editing ? 'Editar mantenimiento' : 'Nuevo mantenimiento'}
         footer={
           <>
             <Button variant="secondary" onClick={() => setFormOpen(false)} disabled={saving}>
@@ -234,7 +275,7 @@ export default function Mantenimientos() {
             </Button>
             <Button type="submit" form="mantenimiento-form" disabled={saving}>
               {saving ? <Spinner size={14} /> : null}
-              {saving ? 'Guardando…' : 'Crear mantenimiento'}
+              {saving ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear mantenimiento'}
             </Button>
           </>
         }
@@ -245,33 +286,31 @@ export default function Mantenimientos() {
               {saveError}
             </p>
           )}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Sector" required>
-              <select
-                className={inputCls}
-                value={form.sectorId}
-                onChange={(e) => setForm({ ...form, sectorId: e.target.value })}
-                required
-              >
-                <option value="">Seleccionar sector</option>
-                {sectores.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.nombre}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Tipo" required>
-              <select
-                className={inputCls}
-                value={form.tipo}
-                onChange={(e) => setForm({ ...form, tipo: e.target.value })}
-              >
-                <option value="PREVENTIVO">Preventivo</option>
-                <option value="CORRECTIVO">Correctivo</option>
-              </select>
-            </Field>
-          </div>
+          <Field label="Sector" required>
+            <select
+              className={inputCls}
+              value={form.sectorId}
+              onChange={(e) => setForm({ ...form, sectorId: e.target.value })}
+              required
+            >
+              <option value="">Seleccionar sector</option>
+              {sectores.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nombre}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Tipo" required>
+            <select
+              className={inputCls}
+              value={form.tipo}
+              onChange={(e) => setForm({ ...form, tipo: e.target.value })}
+            >
+              <option value="PREVENTIVO">Preventivo</option>
+              <option value="CORRECTIVO">Correctivo</option>
+            </select>
+          </Field>
           <Field label="Descripción" required>
             <input
               className={inputCls}
@@ -284,7 +323,7 @@ export default function Mantenimientos() {
           <Field label="Fecha programada" required>
             <input
               type="date"
-              min={today}
+              min={new Date().toISOString().slice(0, 10)}
               className={inputCls}
               value={form.fechaProgramada}
               onChange={(e) => setForm({ ...form, fechaProgramada: e.target.value })}
@@ -301,7 +340,23 @@ export default function Mantenimientos() {
         busy={busy}
         title={actionLabel}
         confirmLabel={actionLabel}
-        message={actionMessage}
+        message={
+          actionTarget?.next === 'EN_CURSO'
+            ? `¿Iniciar el mantenimiento "${actionTarget.descripcion}"?`
+            : actionTarget?.next === 'COMPLETADO'
+              ? `¿Marcar como completado el mantenimiento "${actionTarget.descripcion}"?`
+              : `¿Cancelar el mantenimiento "${actionTarget?.descripcion}"? Esta acción no se puede deshacer.`
+        }
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        busy={deleting}
+        title="Eliminar mantenimiento"
+        confirmLabel="Eliminar"
+        message={`¿Eliminar el mantenimiento "${deleteTarget?.descripcion}"? Esta acción no se puede deshacer.`}
       />
     </div>
   )

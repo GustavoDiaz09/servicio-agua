@@ -42,7 +42,7 @@ PostgreSQL **local** (este equipo): la instalación de Windows (`Program Files`)
 - Proxy de Vite: `/api` → `http://localhost:8080`. Error `[vite] http proxy error ... ECONNREFUSED` en la terminal = **el backend no está corriendo** (8080 cerrado), no es un bug del frontend.
 - Páginas implementadas (rutas en `App.jsx`): Dashboard, Clientes, Tomas, Medidores, Lecturas, Tarifas, Facturas, Pagos, Red (Sectores/Tuberias/Fugas/Mantenimientos), Reportes.
 - Patrones reutilizados: `api` de `src/api/client.js` (`payload.data`), `formatMoney/formatDate/m3` en `lib/format.js`, componentes de `components/ui.jsx` (`DataTable`, `Modal`, `ConfirmDialog`, `Badge`, `estadoTone`, `StatCard`, `EmptyState`, `Field`, `inputCls`, `Button`).
-- Tras modificar frontend, verificar con `npm run build` (desde `frontend/`).
+- Tras modificar frontend, verificar con `npm run build` (desde `frontend/`). La CI corre `npm ci` + `npm run build` (job `frontend` en `.github/workflows/ci.yml`).
 
 ## Estándares de código (obligatorios)
 
@@ -84,3 +84,18 @@ Cada agente trabaja **solo** dentro de su paquete. Un método nuevo en el reposi
 - Tests del módulo en verde; sin imports sin usar ni duplicación de código.
 - `ApiResponse<T>` con códigos HTTP correctos (200/201/400/404/409).
 - Reglas de negocio en Service (no en Controller).
+
+## Estado para continuar — Red (Agente E)
+
+Verificado hoy compilando y testeando desde cero (`git worktree` + `mvnw -q clean compile`):
+- **`HEAD` (`7aef6c9`) compila todo en verde.** El "bloqueo ajeno" que se registró antes (falta de getters en `factura/`/`lectura/`) era **un diagnóstico erróneo**: esas entidades/DTOs **sí** tienen los campos (`Factura.total/periodoDesde/periodoHasta/vencimiento/estado`, `LecturaRequest.medidorId`). No había que arreglar nada ahí.
+- El build en rojo hoy lo causa **solo el trabajo sin commitear de `red/`** (ver `git status`). Corregidos los 2 puntos de abajo, todo el proyecto limpio compila.
+
+**Trabajo en curso de `red/` que todavía NO compila (sin commitear):**
+- `FugaService.java`: `update(Long, FugaRequest)` y `delete(Long)` están **definidos dos veces** → `method update/delete is already defined`.
+- `MantenimientoService.java`: `update()` llama a un helper inexistente `getSector(Long)`; `delete()` tiene typo `mantenerimientoRepository` (falta la `n` de `mantenimiento`).
+- Frontend `Fugas.jsx` / `Mantenimientos.jsx` / `Reportes.jsx` (editar/eliminar + Exportar CSV): `npm run build` en verde ✓.
+
+**Gotcha: aluvión de "cannot find symbol" por Lombok.** Con `clean compile`, cualquier error **real** de javac en un archivo (p. ej. método duplicado, typo) hace que se descarte la generación de Lombok para toda la compilación → lluvia de `cannot find symbol` de getters/setters/`builder()` por casi todos los módulos (`cliente`, `factura`, `lectura`, …). NO son errores reales: los getters existen (Lombok `@Data`). Hay que buscar el **primer** error que no sea de Lombok (suele estar en el archivo que se está editando) y, al arreglarlo, la lluvia desaparece sola.
+
+- No modificar `common/`, entidades, repos ni otros paquetes sin autorización.

@@ -43,6 +43,21 @@ public class MantenimientoController {
         return ResponseEntity.ok(ApiResponse.ok(mantenimientoService.findById(id)));
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<MantenimientoResponse>> update(
+            @PathVariable Long id,
+            @Valid @RequestBody MantenimientoRequest request) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                "Mantenimiento actualizado exitosamente",
+                mantenimientoService.update(id, request)));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
+        mantenimientoService.delete(id);
+        return ResponseEntity.ok(ApiResponse.ok("Mantenimiento eliminado exitosamente", null));
+    }
+
     @PutMapping("/{id}/estado")
     public ResponseEntity<ApiResponse<MantenimientoResponse>> cambiarEstado(
             @PathVariable Long id,

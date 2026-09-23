@@ -34,6 +34,27 @@ const mesActual = () => {
   return { desde: `${anio}-${mes}-01`, hasta: `${anio}-${mes}-${ultimo}` }
 }
 
+function escCSV(v) {
+  if (v === null || v === undefined) return ''
+  return `"${String(v).replace(/"/g, '""')}"`
+}
+
+function exportarCSV(nombre, filas, columnas) {
+  if (!filas || filas.length === 0) return
+  const encabezados = columnas.map((c) => escCSV(c.header))
+  const cuerpo = filas.map((f) => columnas.map((c) => escCSV(f[c.key])).join(','))
+  const csv = [encabezados.join(','), ...cuerpo].join('\n')
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${nombre}.csv`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
 function Barra({ valor, maximo }) {
   const pct = maximo > 0 ? Math.round((Number(valor) / maximo) * 100) : 0
   return (
@@ -139,6 +160,27 @@ export default function Reportes() {
             onClick={() => setRango(mesActual())}
           >
             Este mes
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() =>
+              exportarCSV(
+                seccion === 'consumo' ? 'consumo-por-sector' : 'ventas-por-periodo',
+                seccion === 'consumo' ? consumo : ventas,
+                seccion === 'consumo'
+                  ? [
+                      { key: 'sector', header: 'Sector' },
+                      { key: 'consumoTotal', header: 'Consumo (m³)' },
+                    ]
+                  : [
+                      { key: 'periodo', header: 'Período' },
+                      { key: 'totalVendido', header: 'Total vendido' },
+                    ],
+              )
+            }
+          >
+            <DownloadSimple size={16} weight="bold" />
+            Exportar CSV
           </Button>
         </div>
       )}

@@ -58,6 +58,25 @@ public class MantenimientoService {
     }
 
     @Transactional
+    public MantenimientoResponse update(Long id, MantenimientoRequest request) {
+        Mantenimiento mantenimiento = getMantenimiento(id);
+        if (mantenimiento.getEstado() != EstadoMantenimiento.PROGRAMADO) {
+            throw new BusinessException("Solo se puede editar un mantenimiento programado");
+        }
+        mantenimiento.setSector(sectorRepository.findById(request.getSectorId())
+                .orElseThrow(() -> new ResourceNotFoundException("Sector", request.getSectorId())));
+        mantenimiento.setDescripcion(request.getDescripcion());
+        mantenimiento.setTipo(request.getTipo());
+        mantenimiento.setFechaProgramada(request.getFechaProgramada());
+        return toResponse(mantenimientoRepository.save(mantenimiento));
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        mantenimientoRepository.delete(getMantenimiento(id));
+    }
+
+    @Transactional
     public MantenimientoResponse cambiarEstado(Long id, EstadoMantenimiento nuevoEstado) {
         Mantenimiento mantenimiento = getMantenimiento(id);
         EstadoMantenimiento actual = mantenimiento.getEstado();

@@ -55,6 +55,25 @@ public class FugaService {
     }
 
     @Transactional
+    public FugaResponse update(Long id, FugaRequest request) {
+        Fuga fuga = getFuga(id);
+        if (fuga.getEstado() == EstadoFuga.RESUELTA) {
+            throw new BusinessException("No se puede editar una fuga resuelta");
+        }
+        Sector sector = sectorRepository.findById(request.getSectorId())
+                .orElseThrow(() -> new ResourceNotFoundException("Sector", request.getSectorId()));
+        fuga.setSector(sector);
+        fuga.setUbicacion(request.getUbicacion());
+        fuga.setSeveridad(request.getSeveridad());
+        return toResponse(fugaRepository.save(fuga));
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        fugaRepository.delete(getFuga(id));
+    }
+
+    @Transactional
     public FugaResponse pasarEnCurso(Long id) {
         Fuga fuga = getFuga(id);
         if (fuga.getEstado() == EstadoFuga.RESUELTA) {

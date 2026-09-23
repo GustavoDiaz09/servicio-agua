@@ -41,6 +41,19 @@ public class FugaController {
         return ResponseEntity.ok(ApiResponse.ok(fugaService.findById(id)));
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<FugaResponse>> update(
+            @PathVariable Long id,
+            @Valid @RequestBody FugaRequest request) {
+        return ResponseEntity.ok(ApiResponse.ok("Fuga actualizada exitosamente", fugaService.update(id, request)));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
+        fugaService.delete(id);
+        return ResponseEntity.ok(ApiResponse.ok("Fuga eliminada exitosamente", null));
+    }
+
     @PutMapping("/{id}/en-curso")
     public ResponseEntity<ApiResponse<FugaResponse>> pasarEnCurso(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok("Fuga en curso", fugaService.pasarEnCurso(id)));
