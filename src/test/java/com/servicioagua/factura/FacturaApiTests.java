@@ -32,6 +32,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -69,6 +70,9 @@ class FacturaApiTests {
 
     @Autowired
     private FacturaRepository facturaRepository;
+
+    @Autowired
+    private FacturaVencimientoScheduler facturaVencimientoScheduler;
 
     private int secuencia;
 
@@ -387,5 +391,16 @@ class FacturaApiTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data").value(greaterThanOrEqualTo(1)));
+    }
+
+    @Test
+    void schedulerMarcaFacturasVencidas() {
+        Cliente cliente = crearCliente("Cliente Scheduler");
+        crearFactura(cliente, EstadoFactura.PENDIENTE,
+                new BigDecimal("100.00"), LocalDate.of(2020, 1, 1));
+
+        int marcadas = facturaVencimientoScheduler.marcarVencidas();
+
+        assertTrue(marcadas >= 1);
     }
 }

@@ -87,6 +87,7 @@ PostgreSQL **local** (este equipo): la instalación de Windows (`Program Files`)
 
 ## Gotchas de módulo ya cerrados (no romper)
 
+- Facturas: `FacturaVencimientoScheduler` (`factura/`) marca automáticamente como VENCIDA las pendientes/parciales vencidas cada día a las 00:05 (cron configurable con `app.facturas.marcar-vencidas-cron`); no tocar: si no corre, el marcado sigue disponible en `POST /api/facturas/marcar-vencidas`.
 - Fugas: editables/borrables salvo estado `RESUELTA` → 409. Mantenimientos: editables/borrables solo en `PROGRAMADO` → 409; `fechaProgramada >= hoy` → 400. Los updates resuelven el sector con `sectorRepository.findById(...).orElseThrow(...)`.
 - Frontend Red/Reportes: botones de editar/eliminar solo en estados permitidos; CSV de consumo usa `nombre`, no `sector`.
 - `npm run build` verde **no garantiza runtime OK** (el bundler no detecta identificadores indefinidos): tras tocar páginas, correr `npm run smoke` (requiere backend :8080 + Vite dev :5173 levantados).
