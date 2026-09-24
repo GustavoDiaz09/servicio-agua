@@ -56,6 +56,8 @@ PostgreSQL **local** (este equipo): la instalación de Windows (`Program Files`)
 - Rutas en `App.jsx`; auth: `Login.jsx` (`/login`), guard `RequireAuth`; token JWT en `localStorage` (`agua_token`) vía `auth` de `src/api/client.js`. `api` añade `Authorization: Bearer` automáticamente y en 401 limpia el token y redirige a `/login` (excepto `/auth/login`). Borrado de recursos con **`api.del` (no `api.delete`)**.
 - Patrones reutilizados: `api` de `src/api/client.js` devuelve `payload.data`; `formatMoney/formatDate/m3` en `lib/format.js`; componentes en `components/ui.jsx` (`DataTable`, `Modal`, `ConfirmDialog`, `Badge`, `estadoTone`, `StatCard`, `EmptyState`, `Field`, `inputCls`, `Button`, `PageHeader`, `Spinner`, `Skeleton`).
 - Tras modificar frontend, verificar con `npm run build` (desde `frontend/`). La CI corre `npm ci` + `npm run build` (job `frontend` en `.github/workflows/ci.yml`).
+- **Smoke de rutas: `npm run smoke`** (desde `frontend/`, con backend en :8080 y Vite dev en :5173). Navega las 15 rutas en Edge/Chrome headless vía CDP, detecta `ReferenceError`/`TypeError`/pantallas en blanco y devuelve exit ≠ 0 si alguna falla. `npm run build` verde **no** detecta identificadores indefinidos (rollup no falla ante esas referencias); el smoke sí — es lo que cazó el bug de `DataTable` en Pagos.
+- `ErrorBoundary` (`components/ErrorBoundary.jsx`) envuelve cada página en `App.jsx`: un error de render muestra una tarjeta de recuperación en lugar de desmontar toda la app (pantalla en blanco).
 
 ## Estándares de código (obligatorios)
 
@@ -87,7 +89,7 @@ PostgreSQL **local** (este equipo): la instalación de Windows (`Program Files`)
 
 - Fugas: editables/borrables salvo estado `RESUELTA` → 409. Mantenimientos: editables/borrables solo en `PROGRAMADO` → 409; `fechaProgramada >= hoy` → 400. Los updates resuelven el sector con `sectorRepository.findById(...).orElseThrow(...)`.
 - Frontend Red/Reportes: botones de editar/eliminar solo en estados permitidos; CSV de consumo usa `nombre`, no `sector`.
-- `npm run build` verde **no garantiza runtime OK** (el bundler no detecta identificadores indefinidos): tras tocar páginas, smoke manual con backend corriendo.
+- `npm run build` verde **no garantiza runtime OK** (el bundler no detecta identificadores indefinidos): tras tocar páginas, correr `npm run smoke` (requiere backend :8080 + Vite dev :5173 levantados).
 
 **Gotcha: aluvión de "cannot find symbol" por Lombok.** Con `clean compile`, cualquier error **real** de javac en un archivo (p. ej. método duplicado, typo) hace que se descarte la generación de Lombok para toda la compilación → lluvia de `cannot find symbol` de getters/setters/`builder()` por casi todos los módulos. NO son errores reales: los getters existen (Lombok `@Data`). Buscar el **primer** error que no sea de Lombok (suele estar en el archivo que se está editando); al arreglarlo, la lluvia desaparece sola.
 

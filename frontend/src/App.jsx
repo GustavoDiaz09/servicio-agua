@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import AppLayout from './components/AppLayout'
+import ErrorBoundary from './components/ErrorBoundary'
 import { Skeleton } from './components/ui'
 import { auth } from './api/client'
 
@@ -44,9 +45,11 @@ function Fallback() {
 }
 
 const page = (Component) => (
-  <Suspense fallback={<Fallback />}>
-    <Component />
-  </Suspense>
+  <ErrorBoundary>
+    <Suspense fallback={<Fallback />}>
+      <Component />
+    </Suspense>
+  </ErrorBoundary>
 )
 
 function RequireAuth({ children }) {
