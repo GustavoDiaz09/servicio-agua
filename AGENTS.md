@@ -42,6 +42,7 @@ PostgreSQL **local** (este equipo): la instalación de Windows (`Program Files`)
 - Usuario dev `admin`/`admin123` se autocrea al arrancar (`AdminUserInitializer`) si `app.security.admin-auto-create=true` y no existen usuarios.
 - Config por variables de entorno: `JWT_SECRET` (≥32 bytes, HS256), `JWT_EXPIRATION_MS`, `ADMIN_USER`, `ADMIN_PASSWORD`, `ADMIN_AUTO_CREATE` (defaults en `SecurityProperties`/`application.yml`; sin cambios el secreto expira en 24 h).
 - Sin token/token inválido → 401 con `ApiResponse` JSON uniforme (entry-point en `SecurityConfig`; `AuthenticationException` → 401 también mapeado en `GlobalExceptionHandler`). Rutas inexistentes siguen → 404.
+- Swagger UI incluye botón **Authorize** (esquema `bearerAuth` en `OpenApiConfig`): pegar el token para probar endpoints protegidos con "Try it out".
 
 ## Frontend (fuera del build Maven)
 

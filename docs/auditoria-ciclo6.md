@@ -27,8 +27,8 @@ Método: lectura del diff y del código completo del módulo + verificación de 
 2. **[MEDIA · backend] — El handler de error genérico filtraba el mensaje interno — `common/GlobalExceptionHandler.handleGeneric` → **corregido**.**
    `"Error interno del servidor: " + ex.getMessage()` exponía detalles internos (clases, SQL, rutas) al cliente — fuga de información. Corrección: mensaje fijo `"Error interno del servidor"`. Ningún test dependía del mensaje (riesgo 0 de regresión).
 
-3. **[MEDIA · integración] — Swagger UI sin botón "Authorize" → **abierto (requiere tocar `common/config/OpenApiConfig.java`)**.**
-   Los endpoints protegidos devuelven 401 desde Swagger porque `OpenApiConfig` no declara esquema de seguridad `Bearer`. `permitAll` funciona, pero probar la API desde Swagger exige pegar el token a mano en cada request. Se recomienda agregar `components.securitySchemes` (HTTP Bearer) + requerimiento global en `OpenApiConfig` en un ciclo coordinado (modifica `common/`). Corregir en ciclo coordinado (modifica `common/`).
+3. **[MEDIA · integración] — Swagger UI sin botón "Authorize" — `common/config/OpenApiConfig.java` → **corregido**.**
+   Los endpoints protegidos devolvían 401 desde Swagger porque `OpenApiConfig` no declaraba esquema de seguridad `Bearer`; probar la API exigía pegar el token a mano en cada request. Corrección (autorizada por el orquestador, toca `common/`): `components.securitySchemes` `bearerAuth` (HTTP bearer, formato JWT) + `security` global. Swagger UI ahora muestra el botón **Authorize**; con el token guardado, "Try it out" envía `Authorization: Bearer <token>`. El candado aparece también en `/api/auth/login` (cosmético: no requiere token).
 
 4. **[decisión · configuración] — `JWT_SECRET` default dev conocido → **nota**.**
    Si se despliega sin setear `JWT_SECRET`, la clave firmante es pública en el repo → tokens falsificables. Diseño aceptado para dev (24 h de expiración). En producción **siempre** setear `JWT_SECRET` por entorno (y considerar `ADMIN_AUTO_CREATE=false`). Opcional futuro: fallar al arranque si `JWT_SECRET` no viene del entorno.
@@ -50,4 +50,4 @@ Método: lectura del diff y del código completo del módulo + verificación de 
 
 - Backend de seguridad: correcto y alineado a las convenciones (`SecurityApiTests` 9, suite total **94** verdes, `clean package` OK).
 - Correcciones del ciclo: **1 ALTA** (usuario deshabilitado autenticable — login + token) y **1 MEDIA** (fuga de información en error genérico), ambas con tests de regresión.
-- Queda **1 hallazgo abierto (MEDIA)**: esquema Bearer en Swagger — requiere coordinación por tocar `common/`.
+- Queda **1 hallazgo abierto (MEDIA)**: esquema Bearer en Swagger — requiere coordinación por tocar `common/`. → **Corregido** (2026-09-23, con autorización del orquestador).
