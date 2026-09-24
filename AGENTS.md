@@ -5,31 +5,32 @@ Guía para agentes que trabajen en el **Sistema de Gestión de Agua Potable**.
 ## Stack y arquitectura
 
 - Java 17 · Spring Boot 3.3.5 · Spring Web · Spring Data JPA · Spring Security + JWT (jjwt) · PostgreSQL · Maven (wrapper).
-- Capas `Controller → Service → Repository → Entity`, empaquetado por módulo bajo `com.servicioagua` (`src/main/java/com/servicioagua/`).
-- **Estado actual: backend completo + autenticación JWT** (véase "Seguridad"). `common/`, entidades y repositorios consolidados: **no modificarlos sin coordinación**.
-- DTO/entidades usan Lombok (`@Data`, `@Builder`, `@NoArgsConstructor`, `@AllArgsConstructor`).
+- Capas `Controller → Service → Repository → Entity`, empaquetado por módulo bajo `com.servicioagua` (`src/main/java/com/servicioagua/`). Módulos: `cliente`, `toma`, `medidor`, `lectura`, `tarifa`, `factura`, `pago`, `red`, `security`, `reporte`, `common`.
+- `common/` (enums, `ApiResponse`, `GlobalExceptionHandler`, config) y las entidades/repos de cada módulo están consolidados y **no se modifican sin coordinación** (véase "Frontera de escritura").
+- DTOs/entidades usan Lombok (`@Data`, `@Builder`, `@NoArgsConstructor`, `@AllArgsConstructor`).
 
-## Comandos — backend
+## Comandos — backend (siempre desde la raíz, con el wrapper)
 
-Maven **no** está en el PATH global. Usar siempre el wrapper desde la raíz:
+Maven **no** está en el PATH global. Usar siempre el wrapper:
 
 ```powershell
 .\mvnw.cmd -q compile          # compilar (verificación rápida)
 .\mvnw.cmd -q test             # tests de API: MockMvc + H2 (sin necesidad de PostgreSQL)
+.\mvnw.cmd -q test "-Dtest=ClienteApiTests"   # correr un solo test de módulo
 .\mvnw.cmd -q clean package    # build completo (es lo que corre la CI)
 ```
 
-Arranque dev: requiere base PostgreSQL `bd_servicio_agua` ya creada; credenciales vía `DB_URL`/`DB_USER`/`DB_PASSWORD` (defaults `localhost:5432`, `postgres`/`postgres`). Dev usa `ddl-auto: update` (Hibernate genera el esquema, sin migraciones SQL).
+**Arranque dev con PostgreSQL:** requiere la base `bd_servicio_agua` ya creada; credenciales vía `DB_URL`/`DB_USER`/`DB_PASSWORD` (defaults `localhost:5432`, `postgres`/`postgres`). Dev usa `ddl-auto: update` (Hibernate genera el esquema, sin migraciones SQL).
 
 PostgreSQL **local** (este equipo): la instalación de Windows (`Program Files`) está rota/sin binarios; se usa un **cluster portable PG 17.11** en `%LOCALAPPDATA%\PostgreSQL\pgsql\bin` (datos en `%LOCALAPPDATA%\PostgreSQL\pgdata`, superuser `postgres`/`postgres`, puerto 5432). No es un servicio de Windows: arrancar con `pg_ctl -D <pgdata> -l <log> start` (o `pg_ctl stop`) antes/después de usar el backend. No "reparar" la instalación de `Program Files`.
 
 ```powershell
-.\mvnw.cmd spring-boot:run     # API en http://localhost:8080 (Swagger en /swagger-ui.html, sin auth de login: admin/admin123, gustavo/admin123)
+.\mvnw.cmd spring-boot:run     # API en http://localhost:8080 (Swagger en /swagger-ui.html, sin auth; login: admin/admin123, gustavo/admin123)
 ```
 
-`DataSeeder` (`common/config/`) carga datos demo si `app.seed.enabled=true` (default): `.\mvnw.cmd spring-boot:run -Dspring-boot.run.arguments=--app.seed.enabled=false`. Incluye **3 facturas demo** (PENDIENTE/PARCIAL/VENCIDA) para que la página Pagos muestre la interfaz de cobro; el número se genera con `facturaRepository.countByPeriodoDesde(...) + 1`.
+`DataSeeder` (`common/config/`) carga datos demo si `app.seed.enabled=true` (default): `.\mvnw.cmd spring-boot:run -Dspring-boot.run.arguments=--app.seed.enabled=false`. Incluye **3 facturas demo** (PENDIENTE/PARCIAL/VENCIDA) para la página Pagos; su número se genera con `facturaRepository.countByPeriodoDesde(...) + 1`.
 
-**Dev rápido sin PostgreSQL** (H2 en memoria, mismo `application.yml` de tests vía classpath de test; datos no persistidos):
+**Dev rápido sin PostgreSQL** (H2 en memoria usando el `application.yml` de tests, datos no persistidos):
 
 ```powershell
 .\mvnw.cmd spring-boot:test-run   # API en http://localhost:8080 con datos demo
@@ -40,21 +41,20 @@ PostgreSQL **local** (este equipo): la instalación de Windows (`Program Files`)
 ## Seguridad (JWT)
 
 - Todos los `/api/**` exigen `Authorization: Bearer <token>` salvo `POST /api/auth/login`, Swagger (`/swagger-ui.html`, `/swagger-ui/**`) y OpenAPI (`/v3/api-docs/**`): `permitAll` en `SecurityConfig`.
-- `POST /api/auth/login` con `{ username, password }` → `{ token, username, rol }`. Roles: `ADMIN` (gestión general) y `SUPERADMIN` (único, puede además eliminar usuarios, cambiar rol y contraseña de otros; acceso total). `@EnableMethodSecurity` + `@PreAuthorize("hasRole('SUPERADMIN')")` en los endpoints exclusivos; denegación sin permiso → **403** (`AccessDeniedException` mapeado en `GlobalExceptionHandler`).
+- `POST /api/auth/login` con `{ username, password }` → `{ token, username, rol }`. Roles: `ADMIN` (gestión general) y `SUPERADMIN` (único; además puede eliminar usuarios, cambiar rol y contraseña de otros). `@EnableMethodSecurity` + `@PreAuthorize("hasRole('SUPERADMIN')")` en los endpoints exclusivos; denegación sin permiso → **403** (`AccessDeniedException` mapeado en `GlobalExceptionHandler`).
 - Usuarios dev se autocrean al arrancar (`AdminUserInitializer`) si `app.security.admin-auto-create=true` y no existen usuarios: `admin`/`admin123` (ADMIN) y `gustavo`/`admin123` (SUPERADMIN).
 - Config por variables de entorno: `JWT_SECRET` (≥32 bytes, HS256), `JWT_EXPIRATION_MS`, `ADMIN_AUTO_CREATE`, `ADMIN_USER`, `ADMIN_PASSWORD`, `SUPERADMIN_USER`, `SUPERADMIN_PASSWORD` (defaults en `SecurityProperties`/`application.yml`; sin cambios el secreto expira en 24 h).
-- Sin token/token inválido → 401 con `ApiResponse` JSON uniforme (entry-point en `SecurityConfig`; `AuthenticationException` → 401 también mapeado en `GlobalExceptionHandler`). Rutas inexistentes siguen → 404.
+- Sin token/token inválido → 401 con `ApiResponse` JSON uniforme (entry-point en `SecurityConfig`; `AuthenticationException` → 401 también mapeado en `GlobalExceptionHandler`). Rutas inexistentes → 404.
 - Swagger UI incluye botón **Authorize** (esquema `bearerAuth` en `OpenApiConfig`): pegar el token para probar endpoints protegidos con "Try it out".
 - Gestión de usuarios en `/api/usuarios` (listar/crear/estado/reset clave; `DELETE /{id}` y `PUT /{id}/rol` solo SUPERADMIN) y `PUT /api/auth/change-password` para cambiar la propia clave. Guardas anti-lockout en `UsuarioService` (no gestionarse a sí mismo, no deshabilitar al último admin habilitado, solo un SUPERADMIN posible, no quitar el rol al único superadministrador → 409). Al probar reglas de usuarios en tests, fijar `app.security.admin-auto-create=false`.
 
 ## Frontend (fuera del build Maven)
 
-- `frontend/`: React 19 + Vite 6 + Tailwind 4. No lo compila Maven ni lo toca la CI.
+- `frontend/`: React 19 + Vite 6 + Tailwind 4 (CSS-first: **no hay `tailwind.config.js`**; el tema/`@theme` vive en `src/index.css`). No lo compila Maven ni lo toca la CI.
 - `npm run dev` desde `frontend/` (ejecutar con `npm.cmd` si PowerShell bloquea `npm.ps1`) → `http://localhost:5173`. Si el puerto está ocupado, Vite usa `5174`/`5175…`.
 - Proxy de Vite: `/api` → `http://localhost:8080`. Error `[vite] http proxy error ... ECONNREFUSED` en la terminal = **el backend no está corriendo** (8080 cerrado), no es un bug del frontend.
-- Páginas implementadas (rutas en `App.jsx`): Dashboard, Clientes, Tomas, Medidores, Lecturas, Tarifas, Facturas, Pagos, Red (Sectores/Tuberias/Fugas/Mantenimientos), Reportes, Usuarios.
-- **Auth en el frontend:** `Login.jsx` (`/login`), guard `RequireAuth` en `App.jsx`; el token JWT vive en `localStorage` (`agua_token`) vía `auth` de `client.js`; `api` añade `Authorization: Bearer` automáticamente y en 401 limpia el token y redirige a `/login` (excepto en `/auth/login`). Botón "Salir" en `AppLayout` y botón "Contraseña" (Key) que abre el diálogo de cambio de propia clave (`PUT /api/auth/change-password`).
-- Patrones reutilizados: `api` de `src/api/client.js` (`payload.data`), `formatMoney/formatDate/m3` en `lib/format.js`, componentes de `components/ui.jsx` (`DataTable`, `Modal`, `ConfirmDialog`, `Badge`, `estadoTone`, `StatCard`, `EmptyState`, `Field`, `inputCls`, `Button`).
+- Rutas en `App.jsx`; auth: `Login.jsx` (`/login`), guard `RequireAuth`; token JWT en `localStorage` (`agua_token`) vía `auth` de `src/api/client.js`. `api` añade `Authorization: Bearer` automáticamente y en 401 limpia el token y redirige a `/login` (excepto `/auth/login`). Borrado de recursos con **`api.del` (no `api.delete`)**.
+- Patrones reutilizados: `api` de `src/api/client.js` devuelve `payload.data`; `formatMoney/formatDate/m3` en `lib/format.js`; componentes en `components/ui.jsx` (`DataTable`, `Modal`, `ConfirmDialog`, `Badge`, `estadoTone`, `StatCard`, `EmptyState`, `Field`, `inputCls`, `Button`, `PageHeader`, `Spinner`, `Skeleton`).
 - Tras modificar frontend, verificar con `npm run build` (desde `frontend/`). La CI corre `npm ci` + `npm run build` (job `frontend` en `.github/workflows/ci.yml`).
 
 ## Estándares de código (obligatorios)
@@ -67,31 +67,29 @@ PostgreSQL **local** (este equipo): la instalación de Windows (`Program Files`)
 6. Endpoints bajo `/api/*`. Reglas de negocio en el Service, nunca en el Controller.
 7. Tipos: `LocalDate` (fechas), `BigDecimal` (dinero), `Integer` (consumo), `Long` (ids). Sin migraciones SQL (Hibernate genera el esquema).
 8. Nombres/métodos/columnas en inglés; mensajes al usuario (excepciones, validación) en español. Sin comentarios explicativos.
-9. No agregar dependencias al `pom.xml`, no tocar `common/`, entidades ni repos de otros módulos sin autorización.
+9. No agregar dependencias al `pom.xml`.
 
-## Mapa de propiedad (frontera de escritura)
+## Frontera de escritura
 
-| Paquete | Servicios/Cotrollers/DTOs | Dueño |
-|---|---|---|
-| `cliente/` | `ClienteService/Controller`, DTOs | Agente A |
-| `toma/` + `medidor/` | services, controllers, DTOs (medidor↔toma) | Agente B |
-| `lectura/` + `tarifa/` | services, controllers, DTOs (consumo + tarifa progresiva) | Agente C |
-| `factura/` + `pago/` | services, controllers, DTOs (facturación, pagos, estados) | Agente D |
-| `red/` | `Sector`/`Tuberia`/`Fuga`/`Mantenimiento` + DTOs | Agente E |
-| `reporte/` | `ReporteController/Service`, projections/DTOs | Agente F |
-| `security/` | `Usuario` (entity+repo+service+controller), `AuthService/Controller`, `JwtService`, `SecurityConfig` | ciclo 6-7 |
-| `common/` + entidades + repos | consolidados fase 0 | coordinador |
-
-Cada agente trabaja **solo** dentro de su paquete. Un método nuevo en el repositorio de su módulo puede agregarlo; nada fuera de ese paquete.
+- Cada agente escribe **solo** en su módulo (services/controllers/DTOs). Puede agregar métodos al repositorio de **su propio** módulo; **no** tocar `common/`, entidades, repositorios ni paquetes ajenos sin autorización.
+- Dominios por paquete: `cliente` (clientes), `toma`+`medidor` (vínculo medidor↔toma), `lectura`+`tarifa` (consumo + tarifa progresiva), `factura`+`pago` (facturación/pagos/estados), `red` (Sector/Tuberia/Fuga/Mantenimiento), `reporte` (agregaciones/CSV), `security` (Usuarios, JWT, SecurityConfig).
+- `docs/` registra hallazgos/requisitos de ciclos previos: consultar la auditoría del módulo (`docs/auditoria*.md`) antes de tocar reglas de negocio existentes.
 
 ## Tests
 
-- `src/test/java/com/servicioagua/<modulo>/*ApiTests.java`: `@SpringBootTest` + `MockMvc` + H2 (`MODE=PostgreSQL`) + `@Transactional`. No requieren PostgreSQL.
-- Los tests de módulo usan `@AutoConfigureMockMvc(addFilters = false)` para **desactivar el filtro JWT** (no envían token). Solo `SecurityApiTests` ejercita auth real: crea su propio usuario con `PasswordEncoder` y saca token vía `POST /api/auth/login`.
+- `src/test/java/com/servicioagua/<modulo>/*ApiTests.java`: `@SpringBootTest` + `MockMvc` + H2 (`MODE=PostgreSQL`) + `@Transactional`. No requieren PostgreSQL. Actualmente **119 tests**.
+- Los tests de módulo usan `@AutoConfigureMockMvc(addFilters = false)` para **desactivar el filtro JWT** (no envían token). Solo `SecurityApiTests`/`UsuarioApiTests` ejercitan auth real.
 - La mayoría desactiva el seed con `@SpringBootTest(properties = "app.seed.enabled=false")` y arma sus propios datos; `src/test/resources/application.yml` lo deja activo por defecto.
-- Al cambiar reglas de negocio: actualizar/ampliar el `*ApiTests` del módulo. Correr uno solo: `.\mvnw.cmd -q test "-Dtest=ClienteApiTests"`.
-- CI (`.github/workflows/ci.yml`) corre `./mvnw -B -ntp clean package` en `main`/PRs: el proyecto entero debe compilar y pasar tests, no solo el módulo tocado.
-- `docs/auditoria.md`, `docs/auditoria-ciclo2.md`, `docs/auditoria-ciclo5.md`, `docs/auditoria-red.md`, `docs/auditoria-ciclo6.md` y `docs/auditoria-ciclo7.md` registran hallazgos/requisitos de ciclos previos: consultarlos antes de tocar reglas de negocio existentes.
+- Al cambiar reglas de negocio: actualizar/ampliar el `*ApiTests` del módulo.
+- CI (`.github/workflows/ci.yml`) corre `./mvnw -B -ntp clean package` (+ frontend `npm ci`/`npm run build`) en `main`/PRs: el proyecto entero debe compilar y pasar tests, no solo el módulo tocado.
+
+## Gotchas de módulo ya cerrados (no romper)
+
+- Fugas: editables/borrables salvo estado `RESUELTA` → 409. Mantenimientos: editables/borrables solo en `PROGRAMADO` → 409; `fechaProgramada >= hoy` → 400. Los updates resuelven el sector con `sectorRepository.findById(...).orElseThrow(...)`.
+- Frontend Red/Reportes: botones de editar/eliminar solo en estados permitidos; CSV de consumo usa `nombre`, no `sector`.
+- `npm run build` verde **no garantiza runtime OK** (el bundler no detecta identificadores indefinidos): tras tocar páginas, smoke manual con backend corriendo.
+
+**Gotcha: aluvión de "cannot find symbol" por Lombok.** Con `clean compile`, cualquier error **real** de javac en un archivo (p. ej. método duplicado, typo) hace que se descarte la generación de Lombok para toda la compilación → lluvia de `cannot find symbol` de getters/setters/`builder()` por casi todos los módulos. NO son errores reales: los getters existen (Lombok `@Data`). Buscar el **primer** error que no sea de Lombok (suele estar en el archivo que se está editando); al arreglarlo, la lluvia desaparece sola.
 
 ## Criterios de "hecho"
 
@@ -99,24 +97,3 @@ Cada agente trabaja **solo** dentro de su paquete. Un método nuevo en el reposi
 - Tests del módulo en verde; sin imports sin usar ni duplicación de código.
 - `ApiResponse<T>` con códigos HTTP correctos (200/201/400/401/404/409).
 - Reglas de negocio en Service (no en Controller).
-
-## Estado para continuar — Red (Agente E)
-
-**Cerrado y auditado el 2026-09-23** (commits `e077e42` + correcciones; verificado con `mvnw -q clean package` y `npm run build`). Datos clave para no romper reglas:
-- Fugas: editables/borrables salvo `RESUELTA` (409). Mantenimientos: editables/borrables solo en `PROGRAMADO` (409); `fechaProgramada >= hoy` (400). Updates resuelven el sector con `sectorRepository.findById(...).orElseThrow(...)`.
-- Frontend borra con `api.del`, **no** `api.delete`; botones de editar/eliminar solo en estados permitidos; CSV de consumo usa `nombre`, no `sector`.
-- El "bloqueo" previo de `factura/`/`lectura/` era diagnóstico erróneo: esas entidades/DTOs **sí** tienen los campos (`Factura.total/periodoDesde/periodoHasta/vencimiento/estado`, `LecturaRequest.medidorId`); `HEAD` siempre compiló verde.
-- Auditoría completa en `docs/auditoria-red.md` (7 hallazgos corregidos): consultarlo antes de tocar este módulo.
-
-**Gotcha: aluvión de "cannot find symbol" por Lombok.** Con `clean compile`, cualquier error **real** de javac en un archivo (p. ej. método duplicado, typo) hace que se descarte la generación de Lombok para toda la compilación → lluvia de `cannot find symbol` de getters/setters/`builder()` por casi todos los módulos (`cliente`, `factura`, `lectura`, …). NO son errores reales: los getters existen (Lombok `@Data`). Hay que buscar el **primer** error que no sea de Lombok (suele estar en el archivo que se está editando) y, al arreglarlo, la lluvia desaparece sola.
-
-- No modificar `common/`, entidades, repos ni otros paquetes sin autorización.
-
-## Pendiente — página Pagos (ciclo 7, 2026-09-23)
-
-**Sin cerrar.** El usuario reporta que `/pagos` se muestra en blanco ("solo el fondo, sin menú") en el navegador tras los reinicios del backend. Estado verificado a nivel de backend/proxy (TODO funciona):
-- API devuelve 3 facturas demo por `GET /api/facturas/estado/PENDIENTE|PARCIAL|VENCIDA` (vía proxy 5173→8080) con token válido.
-- Permisos 403/409 de SUPERADMIN funcionando; `mvnw -q compile`, `npm run build` y 119 tests verdes.
-- `client.js` borra el token y redirige a `/login` ante cualquier 401 (sesiones H2 no sobreviven reinicios).
-
-Causa probable en el navegador: sesión/token viejo y un Vite que llevaba horas corriendo (se reinició en limpio, PID 4472). **Pendiente para mañana:** confirmar en el navegador (Ctrl+Shift+R, re-login como `admin` o `gustavo`) y, si sigue en blanco, revisar consola de DevTools; no reconfirmado por el usuario a nivel de UI.

@@ -5,6 +5,7 @@ import { formatDate, formatMoney, m3 } from '../lib/format'
 import {
   Badge,
   Button,
+  DataTable,
   EmptyState,
   Field,
   Modal,
@@ -75,7 +76,15 @@ export default function Pagos() {
     setPagos([])
     setPagosLoading(true)
     try {
-      setPagos(await api.get(`/pagos/factura/${f.id}`) || [])
+      const lista = await api.get(`/pagos/factura/${f.id}`) || []
+      const pagado = lista.reduce((s, p) => s + (Number(p.monto) || 0), 0)
+      const pendiente = Math.max(0, Number(f.total) - pagado)
+      setPagos(lista)
+      setForm({
+        monto: pendiente > 0 ? String(Number(pendiente.toFixed(2))) : '',
+        metodo: 'EFECTIVO',
+        referencia: '',
+      })
     } catch {
       setPagos([])
     } finally {
@@ -301,6 +310,7 @@ export default function Pagos() {
                   className={inputCls}
                   value={form.monto}
                   onChange={(e) => setForm({ ...form, monto: e.target.value })}
+                  onFocus={(e) => e.target.select()}
                   placeholder={String(Number(deudaPendiente.toFixed(2)))}
                   required
                 />
