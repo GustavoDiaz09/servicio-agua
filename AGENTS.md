@@ -4,9 +4,9 @@ Guía para agentes que trabajen en el **Sistema de Gestión de Agua Potable**.
 
 ## Stack y arquitectura
 
-- Java 17 · Spring Boot 3.3.5 · Spring Web · Spring Data JPA · PostgreSQL · Maven (wrapper).
+- Java 17 · Spring Boot 3.3.5 · Spring Web · Spring Data JPA · Spring Security + JWT (jjwt) · PostgreSQL · Maven (wrapper).
 - Capas `Controller → Service → Repository → Entity`, empaquetado por módulo bajo `com.servicioagua` (`src/main/java/com/servicioagua/`).
-- **Estado actual: backend completo** (entidades, repos, services, controllers, DTOs, `DataSeeder`, tests de API, CI). `common/`, entidades y repositorios están consolidados: **no modificarlos sin coordinación**.
+- **Estado actual: backend completo + autenticación JWT** (véase "Seguridad"). `common/`, entidades y repositorios consolidados: **no modificarlos sin coordinación**.
 - DTO/entidades usan Lombok (`@Data`, `@Builder`, `@NoArgsConstructor`, `@AllArgsConstructor`).
 
 ## Comandos — backend
@@ -24,7 +24,7 @@ Arranque dev: requiere base PostgreSQL `bd_servicio_agua` ya creada; credenciale
 PostgreSQL **local** (este equipo): la instalación de Windows (`Program Files`) está rota/sin binarios; se usa un **cluster portable PG 17.11** en `%LOCALAPPDATA%\PostgreSQL\pgsql\bin` (datos en `%LOCALAPPDATA%\PostgreSQL\pgdata`, superuser `postgres`/`postgres`, puerto 5432). No es un servicio de Windows: arrancar con `pg_ctl -D <pgdata> -l <log> start` (o `pg_ctl stop`) antes/después de usar el backend. No "reparar" la instalación de `Program Files`.
 
 ```powershell
-.\mvnw.cmd spring-boot:run     # API en http://localhost:8080 (Swagger en /swagger-ui.html, sin auth)
+.\mvnw.cmd spring-boot:run     # API en http://localhost:8080 (Swagger en /swagger-ui.html, sin auth de login: admin/admin123)
 ```
 
 `DataSeeder` (`common/config/`) carga datos demo si `app.seed.enabled=true` (default): `.\mvnw.cmd spring-boot:run -Dspring-boot.run.arguments=--app.seed.enabled=false`.
@@ -35,12 +35,21 @@ PostgreSQL **local** (este equipo): la instalación de Windows (`Program Files`)
 .\mvnw.cmd spring-boot:test-run   # API en http://localhost:8080 con datos demo
 ```
 
+## Seguridad (JWT)
+
+- Todos los `/api/**` exigen `Authorization: Bearer <token>` salvo `POST /api/auth/login`, Swagger (`/swagger-ui.html`, `/swagger-ui/**`) y OpenAPI (`/v3/api-docs/**`): `permitAll` en `SecurityConfig`.
+- `POST /api/auth/login` con `{ username, password }` → `{ token, username, rol }`. Un único rol `ADMIN`.
+- Usuario dev `admin`/`admin123` se autocrea al arrancar (`AdminUserInitializer`) si `app.security.admin-auto-create=true` y no existen usuarios.
+- Config por variables de entorno: `JWT_SECRET` (≥32 bytes, HS256), `JWT_EXPIRATION_MS`, `ADMIN_USER`, `ADMIN_PASSWORD`, `ADMIN_AUTO_CREATE` (defaults en `SecurityProperties`/`application.yml`; sin cambios el secreto expira en 24 h).
+- Sin token/token inválido → 401 con `ApiResponse` JSON uniforme (entry-point en `SecurityConfig`; `AuthenticationException` → 401 también mapeado en `GlobalExceptionHandler`). Rutas inexistentes siguen → 404.
+
 ## Frontend (fuera del build Maven)
 
 - `frontend/`: React 19 + Vite 6 + Tailwind 4. No lo compila Maven ni lo toca la CI.
 - `npm run dev` desde `frontend/` (ejecutar con `npm.cmd` si PowerShell bloquea `npm.ps1`) → `http://localhost:5173`. Si el puerto está ocupado, Vite usa `5174`/`5175…`.
 - Proxy de Vite: `/api` → `http://localhost:8080`. Error `[vite] http proxy error ... ECONNREFUSED` en la terminal = **el backend no está corriendo** (8080 cerrado), no es un bug del frontend.
 - Páginas implementadas (rutas en `App.jsx`): Dashboard, Clientes, Tomas, Medidores, Lecturas, Tarifas, Facturas, Pagos, Red (Sectores/Tuberias/Fugas/Mantenimientos), Reportes.
+- **Auth en el frontend:** `Login.jsx` (`/login`), guard `RequireAuth` en `App.jsx`; el token JWT vive en `localStorage` (`agua_token`) vía `auth` de `client.js`; `api` añade `Authorization: Bearer` automáticamente y en 401 limpia el token y redirige a `/login` (excepto en `/auth/login`). Botón "Salir" en `AppLayout`.
 - Patrones reutilizados: `api` de `src/api/client.js` (`payload.data`), `formatMoney/formatDate/m3` en `lib/format.js`, componentes de `components/ui.jsx` (`DataTable`, `Modal`, `ConfirmDialog`, `Badge`, `estadoTone`, `StatCard`, `EmptyState`, `Field`, `inputCls`, `Button`).
 - Tras modificar frontend, verificar con `npm run build` (desde `frontend/`). La CI corre `npm ci` + `npm run build` (job `frontend` en `.github/workflows/ci.yml`).
 
@@ -66,6 +75,7 @@ PostgreSQL **local** (este equipo): la instalación de Windows (`Program Files`)
 | `factura/` + `pago/` | services, controllers, DTOs (facturación, pagos, estados) | Agente D |
 | `red/` | `Sector`/`Tuberia`/`Fuga`/`Mantenimiento` + DTOs | Agente E |
 | `reporte/` | `ReporteController/Service`, projections/DTOs | Agente F |
+| `security/` | `Usuario` (entity+repo), `AuthService/Controller`, `JwtService`, `SecurityConfig` | ciclo 6 |
 | `common/` + entidades + repos | consolidados fase 0 | coordinador |
 
 Cada agente trabaja **solo** dentro de su paquete. Un método nuevo en el repositorio de su módulo puede agregarlo; nada fuera de ese paquete.
@@ -73,26 +83,26 @@ Cada agente trabaja **solo** dentro de su paquete. Un método nuevo en el reposi
 ## Tests
 
 - `src/test/java/com/servicioagua/<modulo>/*ApiTests.java`: `@SpringBootTest` + `MockMvc` + H2 (`MODE=PostgreSQL`) + `@Transactional`. No requieren PostgreSQL.
+- Los tests de módulo usan `@AutoConfigureMockMvc(addFilters = false)` para **desactivar el filtro JWT** (no envían token). Solo `SecurityApiTests` ejercita auth real: crea su propio usuario con `PasswordEncoder` y saca token vía `POST /api/auth/login`.
 - La mayoría desactiva el seed con `@SpringBootTest(properties = "app.seed.enabled=false")` y arma sus propios datos; `src/test/resources/application.yml` lo deja activo por defecto.
 - Al cambiar reglas de negocio: actualizar/ampliar el `*ApiTests` del módulo. Correr uno solo: `.\mvnw.cmd -q test "-Dtest=ClienteApiTests"`.
 - CI (`.github/workflows/ci.yml`) corre `./mvnw -B -ntp clean package` en `main`/PRs: el proyecto entero debe compilar y pasar tests, no solo el módulo tocado.
-- `docs/auditoria.md`, `docs/auditoria-ciclo2.md` y `docs/auditoria-ciclo5.md` registran hallazgos/requisitos de ciclos previos: consultarlos antes de tocar reglas de negocio existentes. El ciclo 5 agregó el handler `NoResourceFoundException` → 404 en `common/` (autorizado por el orquestador).
+- `docs/auditoria.md`, `docs/auditoria-ciclo2.md`, `docs/auditoria-ciclo5.md`, `docs/auditoria-red.md` y `docs/auditoria-ciclo6.md` registran hallazgos/requisitos de ciclos previos: consultarlos antes de tocar reglas de negocio existentes.
 
 ## Criterios de "hecho"
 
 - `.\mvnw.cmd -q compile` sin errores desde la raíz.
 - Tests del módulo en verde; sin imports sin usar ni duplicación de código.
-- `ApiResponse<T>` con códigos HTTP correctos (200/201/400/404/409).
+- `ApiResponse<T>` con códigos HTTP correctos (200/201/400/401/404/409).
 - Reglas de negocio en Service (no en Controller).
 
 ## Estado para continuar — Red (Agente E)
 
-**Cerrado y auditado el 2026-09-23** (commits `e077e42` + correcciones de auditoría; verificado con `mvnw -q clean package` y `npm run build`):
-- `red/` CRUD completo: Fugas y Mantenimientos con `PUT`/`DELETE` (controllers + services). Fuga editable y borrable salvo `RESUELTA` (409); Mantenimiento editable y borrable solo en `PROGRAMADO` (409); los updates resuelven el sector con `sectorRepository.findById(...).orElseThrow(...)`; `MantenimientoService.update` valida `fechaProgramada >= hoy` (400), igual que `create`.
-- `RedApiTests` = 24 tests (update/delete 200/404/409, sector inexistente 404, fecha pasada 400). Suite completa: **83 tests verdes**.
-- Frontend: `Fugas.jsx` y `Mantenimientos.jsx` con editar/eliminar (`api.del`, no `api.delete`) y botones editables solo en estados permitidos; `Reportes.jsx` con helpers `escCSV`/`exportarCSV` (CSV de consumo usa `nombre`, no `sector`), icono `DownloadSimple` importado.
-- Auditoría completa en `docs/auditoria-red.md`: 7 hallazgos (2 ALTA de runtime, 2 MEDIA, 3 BAJA) todos corregidos. Consultarlo antes de tocar este módulo.
+**Cerrado y auditado el 2026-09-23** (commits `e077e42` + correcciones; verificado con `mvnw -q clean package` y `npm run build`). Datos clave para no romper reglas:
+- Fugas: editables/borrables salvo `RESUELTA` (409). Mantenimientos: editables/borrables solo en `PROGRAMADO` (409); `fechaProgramada >= hoy` (400). Updates resuelven el sector con `sectorRepository.findById(...).orElseThrow(...)`.
+- Frontend borra con `api.del`, **no** `api.delete`; botones de editar/eliminar solo en estados permitidos; CSV de consumo usa `nombre`, no `sector`.
 - El "bloqueo" previo de `factura/`/`lectura/` era diagnóstico erróneo: esas entidades/DTOs **sí** tienen los campos (`Factura.total/periodoDesde/periodoHasta/vencimiento/estado`, `LecturaRequest.medidorId`); `HEAD` siempre compiló verde.
+- Auditoría completa en `docs/auditoria-red.md` (7 hallazgos corregidos): consultarlo antes de tocar este módulo.
 
 **Gotcha: aluvión de "cannot find symbol" por Lombok.** Con `clean compile`, cualquier error **real** de javac en un archivo (p. ej. método duplicado, typo) hace que se descarte la generación de Lombok para toda la compilación → lluvia de `cannot find symbol` de getters/setters/`builder()` por casi todos los módulos (`cliente`, `factura`, `lectura`, …). NO son errores reales: los getters existen (Lombok `@Data`). Hay que buscar el **primer** error que no sea de Lombok (suele estar en el archivo que se está editando) y, al arreglarlo, la lluvia desaparece sola.
 

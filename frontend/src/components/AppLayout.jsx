@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   Calculator,
   ChartLineUp,
@@ -13,6 +13,7 @@ import {
   PencilSimpleLine,
   Pipe,
   Receipt,
+  SignOut,
   SquaresFour,
   Sun,
   UsersThree,
@@ -20,6 +21,7 @@ import {
   Wrench,
 } from '@phosphor-icons/react'
 import { useTheme } from '../theme/ThemeContext'
+import { api, auth } from '../api/client'
 
 const NAV = [
   {
@@ -111,8 +113,9 @@ function SidebarContent({ onNavigate }) {
 function ApiStatus() {
   const [status, setStatus] = useState('loading')
   useEffect(() => {
-    fetch('/api/clientes')
-      .then((res) => setStatus(res.ok ? 'ok' : 'error'))
+    api
+      .get('/clientes')
+      .then(() => setStatus('ok'))
       .catch(() => setStatus('error'))
   }, [])
 
@@ -133,6 +136,12 @@ function ApiStatus() {
 export default function AppLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
   const { theme: mode, toggle } = useTheme()
+  const navigate = useNavigate()
+
+  function logout() {
+    auth.clear()
+    navigate('/login', { replace: true })
+  }
 
   return (
     <div className="min-h-dvh">
@@ -172,6 +181,14 @@ export default function AppLayout() {
             >
               {mode === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
               <span className="hidden sm:inline">{mode === 'dark' ? 'Claro' : 'Oscuro'}</span>
+            </button>
+            <button
+              onClick={logout}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 transition-colors hover:bg-red-50 hover:text-red-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+              aria-label="Cerrar sesión"
+            >
+              <SignOut size={16} />
+              <span className="hidden sm:inline">Salir</span>
             </button>
           </div>
         </header>

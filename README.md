@@ -13,6 +13,7 @@ API REST para la administración integral de un servicio de agua potable: client
 | Web | Spring Web (REST) |
 | Persistencia | Spring Data JPA / Hibernate |
 | Base de datos | PostgreSQL 16 |
+| Seguridad | Spring Security + JWT (jjwt) |
 | Build | Maven (wrapper `./mvnw`) |
 | Validación | Jakarta Validation |
 | Documentación API | Springdoc / Swagger UI |
@@ -41,6 +42,7 @@ tarifa/     Tarifa (tramos progresivos con vigencia)
 factura/    Factura (generación por periodo, cálculo progresivo, anulación)
 pago/       Pago (total/parcial, actualiza estado de factura)
 red/        Sector, Tuberia, Fuga, Mantenimiento
+security/   Usuario, login JWT, filtro de autenticación, config Seguridad
 reporte/    Consultas de agregación
 ```
 
@@ -60,6 +62,11 @@ Variables de entorno (con defaults para dev):
 | `DB_USER` | `postgres` | Usuario |
 | `DB_PASSWORD` | `postgres` | Contraseña |
 | `CORS_ORIGINS` | `http://localhost:5173,...` | Orígenes permitidos |
+| `JWT_SECRET` | clave dev (≥32 bytes) | Secreto HS256 para firmar tokens |
+| `JWT_EXPIRATION_MS` | `86400000` (24 h) | Vida del token |
+| `ADMIN_AUTO_CREATE` | `true` | Crea usuario admin inicial si no hay usuarios |
+| `ADMIN_USER` | `admin` | Usuario admin inicial |
+| `ADMIN_PASSWORD` | `admin123` | Contraseña admin inicial |
 
 > Dev usa `ddl-auto: update` (Hibernate crea/actualiza el esquema). Crear la base antes de arrancar:
 >
@@ -67,11 +74,15 @@ Variables de entorno (con defaults para dev):
 > CREATE DATABASE bd_servicio_agua;
 > ```
 
+> **Seguridad:** todos los endpoints bajo `/api/**` exigen token JWT (`Authorization: Bearer <token>`), salvo `POST /api/auth/login`, Swagger (`/swagger-ui/**`, `/swagger-ui.html`) y OpenAPI (`/v3/api-docs/**`). Credenciales dev: `admin` / `admin123` (cambiar `ADMIN_PASSWORD` en producción y desactivar `ADMIN_AUTO_CREATE` si procede).
+
 ## Seguridad en producción
 
-- `springdoc` expone **Swagger UI** (`/swagger-ui.html`) y **OpenAPI** (`/v3/api-docs`) sin autenticación. El proyecto no incluye spring-security; en producción restringir esos endpoints por red/proxy/gateway o añadir seguridad si el responsable lo autoriza.
-- Desconocidos → 404 con `ApiResponse` uniforme (`NoHandlerFoundException` mapeado en `GlobalExceptionHandler`).
-- Credenciales de BD solo por variables de entorno (nunca en el repositorio).
+- Autenticación **JWT stateless** (Spring Security 6): `POST /api/auth/login` devuelve `{ token, username, rol }`; el resto de `/api/*` requiere el token en `Authorization`.
+- Un único rol `ADMIN`; el usuario inicial se autocrea en arranque si `ADMIN_AUTO_CREATE=true` y no existen usuarios.
+- Swagger UI / OpenAPI siguen accesibles sin autenticación (window de documentación o restringir por red/gateway en producción).
+- Desconocidos → 404 con `ApiResponse` uniforme (`NoHandlerFoundException` mapeado en `GlobalExceptionHandler`). Pérdida/ausencia de autenticación → 401 con `ApiResponse`.
+- Credenciales de BD y JWT solo por variables de entorno (nunca en el repositorio).
 
 ## Ejecución
 
@@ -89,6 +100,7 @@ La API queda en `http://localhost:8080`.
 
 | Módulo | Endpoints |
 |---|---|
+| Auth | `POST /api/auth/login` |
 | Clientes | `GET/POST /api/clientes`, `GET/PUT/DELETE /api/clientes/{id}`, `GET /api/clientes?documento=` |
 | Tomas | `GET/POST /api/tomas`, `GET /api/tomas/cliente/{id}`, `GET /api/tomas/sector/{id}`, `PUT /api/tomas/{id}/baja` |
 | Medidores | `GET/POST /api/medidores`, `PUT /api/medidores/{id}/asignar`, `PUT /api/medidores/{id}/retirar` |
@@ -126,6 +138,7 @@ Todas las respuestas se envuelven en `ApiResponse<T>`:
 |---|---|
 | 200 / 201 | Éxito |
 | 400 | Validación / argumentos inválidos |
+| 401 | No autenticado / credenciales o token inválidos |
 | 404 | Recurso no encontrado |
 | 409 | Conflicto de negocio o duplicado |
 

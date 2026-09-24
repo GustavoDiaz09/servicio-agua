@@ -1,9 +1,21 @@
 const BASE = '/api'
+const TOKEN_KEY = 'agua_token'
+
+export const auth = {
+  getToken: () => localStorage.getItem(TOKEN_KEY),
+  setToken: (token) => localStorage.setItem(TOKEN_KEY, token),
+  clear: () => localStorage.removeItem(TOKEN_KEY),
+}
 
 async function request(path, { method = 'GET', body } = {}) {
+  const headers = {}
+  if (body) headers['Content-Type'] = 'application/json'
+  const token = auth.getToken()
+  if (token) headers.Authorization = `Bearer ${token}`
+
   const res = await fetch(BASE + path, {
     method,
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    headers,
     body: body ? JSON.stringify(body) : undefined,
   })
 
@@ -12,6 +24,11 @@ async function request(path, { method = 'GET', body } = {}) {
     payload = await res.json()
   } catch {
     /* cuerpo vacío */
+  }
+
+  if (res.status === 401 && path !== '/auth/login') {
+    auth.clear()
+    if (window.location.pathname !== '/login') window.location.assign('/login')
   }
 
   if (!res.ok) {

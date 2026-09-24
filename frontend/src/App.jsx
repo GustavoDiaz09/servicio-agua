@@ -1,8 +1,10 @@
 import { lazy, Suspense } from 'react'
-import { Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes } from 'react-router-dom'
 import AppLayout from './components/AppLayout'
 import { Skeleton } from './components/ui'
+import { auth } from './api/client'
 
+const Login = lazy(() => import('./pages/Login'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Clientes = lazy(() => import('./pages/Clientes'))
 const Tomas = lazy(() => import('./pages/Tomas'))
@@ -46,10 +48,22 @@ const page = (Component) => (
   </Suspense>
 )
 
+function RequireAuth({ children }) {
+  return auth.getToken() ? children : <Navigate to="/login" replace />
+}
+
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<AppLayout />}>
+      <Route path="/login" element={page(Login)} />
+      <Route
+        path="/"
+        element={
+          <RequireAuth>
+            <AppLayout />
+          </RequireAuth>
+        }
+      >
         <Route index element={page(Dashboard)} />
         <Route path="clientes" element={page(Clientes)} />
         <Route path="tomas" element={page(Tomas)} />
