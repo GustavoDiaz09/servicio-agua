@@ -403,4 +403,15 @@ class FacturaApiTests {
 
         assertTrue(marcadas >= 1);
     }
+
+    @Test
+    void schedulerMarcaVencidasAlArrancar() {
+        Cliente cliente = crearCliente("Cliente Arranque");
+        crearFactura(cliente, EstadoFactura.PENDIENTE,
+                new BigDecimal("100.00"), LocalDate.of(2020, 1, 1));
+
+        int marcadas = facturaVencimientoScheduler.marcarVencidasAlArrancar();
+
+        assertTrue(marcadas >= 1);
+    }
 }

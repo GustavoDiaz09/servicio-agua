@@ -1,6 +1,8 @@
 package com.servicioagua.factura;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -15,5 +17,10 @@ public class FacturaVencimientoScheduler {
     @Scheduled(cron = "${app.facturas.marcar-vencidas-cron:0 5 0 * * *}")
     public int marcarVencidas() {
         return facturaService.marcarVencidas();
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    public int marcarVencidasAlArrancar() {
+        return marcarVencidas();
     }
 }

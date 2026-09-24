@@ -5,7 +5,7 @@ services:
   - type: web
     name: servicio-agua-backend
     runtime: docker
-    plan: starter
+    plan: free
     dockerfilePath: ./Dockerfile
     healthCheckPath: /swagger-ui.html
     envVars:
