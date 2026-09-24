@@ -24,7 +24,6 @@ services:
       # Dominio del frontend en Vercel (separar con comas si hay varios)
       - key: CORS_ORIGINS
         value: https://servicio-agua.vercel.app
-        sync: false
       # Sin datos demo en producción; Hibernate crea el esquema con ddl-auto: update
       - key: APP_SEED_ENABLED
         value: "false"
