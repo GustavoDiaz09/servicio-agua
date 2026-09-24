@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: ${PORT:8080}
 
 spring:
   application:
@@ -33,6 +33,8 @@ springdoc:
     operations-sorter: method
 
 app:
+  seed:
+    enabled: ${APP_SEED_ENABLED:true}
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:4200,http://localhost:3000}
   security:
