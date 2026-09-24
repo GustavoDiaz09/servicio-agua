@@ -43,6 +43,7 @@ PostgreSQL **local** (este equipo): la instalación de Windows (`Program Files`)
 - Config por variables de entorno: `JWT_SECRET` (≥32 bytes, HS256), `JWT_EXPIRATION_MS`, `ADMIN_USER`, `ADMIN_PASSWORD`, `ADMIN_AUTO_CREATE` (defaults en `SecurityProperties`/`application.yml`; sin cambios el secreto expira en 24 h).
 - Sin token/token inválido → 401 con `ApiResponse` JSON uniforme (entry-point en `SecurityConfig`; `AuthenticationException` → 401 también mapeado en `GlobalExceptionHandler`). Rutas inexistentes siguen → 404.
 - Swagger UI incluye botón **Authorize** (esquema `bearerAuth` en `OpenApiConfig`): pegar el token para probar endpoints protegidos con "Try it out".
+- Gestión de usuarios en `/api/usuarios` (listar/crear/estado/reset clave, rol único `ADMIN`) y `PUT /api/auth/change-password` para cambiar la propia clave. Guardas anti-lockout en `UsuarioService` (no deshabilitarse a sí mismo, no deshabilitar al único admin habilitado → 409). Al probar reglas de usuarios en tests, fijar `app.security.admin-auto-create=false`.
 
 ## Frontend (fuera del build Maven)
 
@@ -76,7 +77,7 @@ PostgreSQL **local** (este equipo): la instalación de Windows (`Program Files`)
 | `factura/` + `pago/` | services, controllers, DTOs (facturación, pagos, estados) | Agente D |
 | `red/` | `Sector`/`Tuberia`/`Fuga`/`Mantenimiento` + DTOs | Agente E |
 | `reporte/` | `ReporteController/Service`, projections/DTOs | Agente F |
-| `security/` | `Usuario` (entity+repo), `AuthService/Controller`, `JwtService`, `SecurityConfig` | ciclo 6 |
+| `security/` | `Usuario` (entity+repo+service+controller), `AuthService/Controller`, `JwtService`, `SecurityConfig` | ciclo 6-7 |
 | `common/` + entidades + repos | consolidados fase 0 | coordinador |
 
 Cada agente trabaja **solo** dentro de su paquete. Un método nuevo en el repositorio de su módulo puede agregarlo; nada fuera de ese paquete.
@@ -88,7 +89,7 @@ Cada agente trabaja **solo** dentro de su paquete. Un método nuevo en el reposi
 - La mayoría desactiva el seed con `@SpringBootTest(properties = "app.seed.enabled=false")` y arma sus propios datos; `src/test/resources/application.yml` lo deja activo por defecto.
 - Al cambiar reglas de negocio: actualizar/ampliar el `*ApiTests` del módulo. Correr uno solo: `.\mvnw.cmd -q test "-Dtest=ClienteApiTests"`.
 - CI (`.github/workflows/ci.yml`) corre `./mvnw -B -ntp clean package` en `main`/PRs: el proyecto entero debe compilar y pasar tests, no solo el módulo tocado.
-- `docs/auditoria.md`, `docs/auditoria-ciclo2.md`, `docs/auditoria-ciclo5.md`, `docs/auditoria-red.md` y `docs/auditoria-ciclo6.md` registran hallazgos/requisitos de ciclos previos: consultarlos antes de tocar reglas de negocio existentes.
+- `docs/auditoria.md`, `docs/auditoria-ciclo2.md`, `docs/auditoria-ciclo5.md`, `docs/auditoria-red.md`, `docs/auditoria-ciclo6.md` y `docs/auditoria-ciclo7.md` registran hallazgos/requisitos de ciclos previos: consultarlos antes de tocar reglas de negocio existentes.
 
 ## Criterios de "hecho"
 

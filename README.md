@@ -100,7 +100,8 @@ La API queda en `http://localhost:8080`.
 
 | Módulo | Endpoints |
 |---|---|
-| Auth | `POST /api/auth/login` |
+| Auth | `POST /api/auth/login`, `PUT /api/auth/change-password` |
+| Usuarios | `GET/POST /api/usuarios`, `PUT /api/usuarios/{id}/estado`, `PUT /api/usuarios/{id}/password` |
 | Clientes | `GET/POST /api/clientes`, `GET/PUT/DELETE /api/clientes/{id}`, `GET /api/clientes?documento=` |
 | Tomas | `GET/POST /api/tomas`, `GET /api/tomas/cliente/{id}`, `GET /api/tomas/sector/{id}`, `PUT /api/tomas/{id}/baja` |
 | Medidores | `GET/POST /api/medidores`, `PUT /api/medidores/{id}/asignar`, `PUT /api/medidores/{id}/retirar` |
