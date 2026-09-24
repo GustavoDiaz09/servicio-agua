@@ -17,6 +17,7 @@ const Sectores = lazy(() => import('./pages/Sectores'))
 const Tuberias = lazy(() => import('./pages/Tuberias'))
 const Fugas = lazy(() => import('./pages/Fugas'))
 const Mantenimientos = lazy(() => import('./pages/Mantenimientos'))
+const Usuarios = lazy(() => import('./pages/Usuarios'))
 const Reportes = lazy(() => import('./pages/Reportes'))
 
 function Fallback() {
@@ -76,6 +77,7 @@ export default function App() {
         <Route path="tuberias" element={page(Tuberias)} />
         <Route path="fugas" element={page(Fugas)} />
         <Route path="mantenimientos" element={page(Mantenimientos)} />
+        <Route path="usuarios" element={page(Usuarios)} />
         <Route path="reportes" element={page(Reportes)} />
         <Route path="*" element={page(Dashboard)} />
       </Route>

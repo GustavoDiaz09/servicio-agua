@@ -7,12 +7,14 @@ import {
   Drop,
   FlowArrow,
   Gauge,
+  Key,
   List,
   MapTrifold,
   Moon,
   PencilSimpleLine,
   Pipe,
   Receipt,
+  ShieldCheck,
   SignOut,
   SquaresFour,
   Sun,
@@ -22,6 +24,7 @@ import {
 } from '@phosphor-icons/react'
 import { useTheme } from '../theme/ThemeContext'
 import { api, auth } from '../api/client'
+import { Button, Field, Modal, Spinner, inputCls } from './ui'
 
 const NAV = [
   {
@@ -52,6 +55,10 @@ const NAV = [
   {
     section: 'Análisis',
     items: [{ to: '/reportes', label: 'Reportes', icon: ChartLineUp }],
+  },
+  {
+    section: 'Sistema',
+    items: [{ to: '/usuarios', label: 'Usuarios', icon: ShieldCheck }],
   },
 ]
 
@@ -135,12 +142,52 @@ function ApiStatus() {
 
 export default function AppLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [passOpen, setPassOpen] = useState(false)
+  const [passForm, setPassForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
+  const [passError, setPassError] = useState('')
+  const [passSuccess, setPassSuccess] = useState('')
+  const [passSaving, setPassSaving] = useState(false)
   const { theme: mode, toggle } = useTheme()
   const navigate = useNavigate()
 
   function logout() {
     auth.clear()
     navigate('/login', { replace: true })
+  }
+
+  function setPassCampo(campo, valor) {
+    setPassForm((f) => ({ ...f, [campo]: valor }))
+  }
+
+  function cerrarPassword() {
+    if (passSaving) return
+    setPassOpen(false)
+    setPassError('')
+    setPassSuccess('')
+    setPassForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+  }
+
+  async function guardarPassword(e) {
+    e.preventDefault()
+    setPassError('')
+    setPassSuccess('')
+    if (passForm.newPassword !== passForm.confirmPassword) {
+      setPassError('Las contraseñas no coinciden')
+      return
+    }
+    setPassSaving(true)
+    try {
+      await api.put('/auth/change-password', {
+        currentPassword: passForm.currentPassword,
+        newPassword: passForm.newPassword,
+      })
+      setPassSuccess('Contraseña actualizada correctamente.')
+      setPassForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+    } catch (err) {
+      setPassError(err.message)
+    } finally {
+      setPassSaving(false)
+    }
   }
 
   return (
@@ -175,6 +222,14 @@ export default function AppLayout() {
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setPassOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+              aria-label="Cambiar contraseña"
+            >
+              <Key size={16} />
+              <span className="hidden sm:inline">Contraseña</span>
+            </button>
+            <button
               onClick={toggle}
               className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
               aria-label="Cambiar tema"
@@ -197,6 +252,70 @@ export default function AppLayout() {
           <Outlet />
         </main>
       </div>
+
+      <Modal
+        open={passOpen}
+        onClose={cerrarPassword}
+        title="Cambiar contraseña"
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={cerrarPassword} disabled={passSaving}>
+              Cancelar
+            </Button>
+            <Button type="submit" form="form-password" disabled={passSaving}>
+              {passSaving ? <Spinner size={14} /> : null}
+              {passSaving ? 'Guardando…' : 'Actualizar'}
+            </Button>
+          </>
+        }
+      >
+        <form id="form-password" onSubmit={guardarPassword} className="space-y-4">
+          <Field label="Contraseña actual" required>
+            <input
+              className={inputCls}
+              type="password"
+              value={passForm.currentPassword}
+              onChange={(e) => setPassCampo('currentPassword', e.target.value)}
+              placeholder="••••••••"
+              autoComplete="current-password"
+              required
+            />
+          </Field>
+          <Field label="Nueva contraseña" required hint="Mínimo 8 caracteres.">
+            <input
+              className={inputCls}
+              type="password"
+              value={passForm.newPassword}
+              onChange={(e) => setPassCampo('newPassword', e.target.value)}
+              placeholder="••••••••"
+              minLength={8}
+              maxLength={100}
+              autoComplete="new-password"
+              required
+            />
+          </Field>
+          <Field label="Confirmar nueva contraseña" required>
+            <input
+              className={inputCls}
+              type="password"
+              value={passForm.confirmPassword}
+              onChange={(e) => setPassCampo('confirmPassword', e.target.value)}
+              placeholder="••••••••"
+              minLength={8}
+              maxLength={100}
+              autoComplete="new-password"
+              required
+            />
+          </Field>
+          {passError && <p className="text-sm text-red-600 dark:text-red-400">{passError}</p>}
+          {passSuccess && (
+            <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+              {passSuccess}
+            </p>
+          )}
+        </form>
+      </Modal>
     </div>
   )
 }

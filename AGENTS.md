@@ -50,8 +50,8 @@ PostgreSQL **local** (este equipo): la instalación de Windows (`Program Files`)
 - `frontend/`: React 19 + Vite 6 + Tailwind 4. No lo compila Maven ni lo toca la CI.
 - `npm run dev` desde `frontend/` (ejecutar con `npm.cmd` si PowerShell bloquea `npm.ps1`) → `http://localhost:5173`. Si el puerto está ocupado, Vite usa `5174`/`5175…`.
 - Proxy de Vite: `/api` → `http://localhost:8080`. Error `[vite] http proxy error ... ECONNREFUSED` en la terminal = **el backend no está corriendo** (8080 cerrado), no es un bug del frontend.
-- Páginas implementadas (rutas en `App.jsx`): Dashboard, Clientes, Tomas, Medidores, Lecturas, Tarifas, Facturas, Pagos, Red (Sectores/Tuberias/Fugas/Mantenimientos), Reportes.
-- **Auth en el frontend:** `Login.jsx` (`/login`), guard `RequireAuth` en `App.jsx`; el token JWT vive en `localStorage` (`agua_token`) vía `auth` de `client.js`; `api` añade `Authorization: Bearer` automáticamente y en 401 limpia el token y redirige a `/login` (excepto en `/auth/login`). Botón "Salir" en `AppLayout`.
+- Páginas implementadas (rutas en `App.jsx`): Dashboard, Clientes, Tomas, Medidores, Lecturas, Tarifas, Facturas, Pagos, Red (Sectores/Tuberias/Fugas/Mantenimientos), Reportes, Usuarios.
+- **Auth en el frontend:** `Login.jsx` (`/login`), guard `RequireAuth` en `App.jsx`; el token JWT vive en `localStorage` (`agua_token`) vía `auth` de `client.js`; `api` añade `Authorization: Bearer` automáticamente y en 401 limpia el token y redirige a `/login` (excepto en `/auth/login`). Botón "Salir" en `AppLayout` y botón "Contraseña" (Key) que abre el diálogo de cambio de propia clave (`PUT /api/auth/change-password`).
 - Patrones reutilizados: `api` de `src/api/client.js` (`payload.data`), `formatMoney/formatDate/m3` en `lib/format.js`, componentes de `components/ui.jsx` (`DataTable`, `Modal`, `ConfirmDialog`, `Badge`, `estadoTone`, `StatCard`, `EmptyState`, `Field`, `inputCls`, `Button`).
 - Tras modificar frontend, verificar con `npm run build` (desde `frontend/`). La CI corre `npm ci` + `npm run build` (job `frontend` en `.github/workflows/ci.yml`).
 

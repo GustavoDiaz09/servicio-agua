@@ -26,6 +26,17 @@ export function formatDate(value) {
   })
 }
 
+export function formatDateTime(value) {
+  if (!value) return '—'
+  return new Date(value).toLocaleString('es-CO', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 export function m3(value) {
   if (value === null || value === undefined) return '—'
   return `${formatNumber(value)} m³`
