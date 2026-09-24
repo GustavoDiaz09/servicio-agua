@@ -64,9 +64,11 @@ Variables de entorno (con defaults para dev):
 | `CORS_ORIGINS` | `http://localhost:5173,...` | Orígenes permitidos |
 | `JWT_SECRET` | clave dev (≥32 bytes) | Secreto HS256 para firmar tokens |
 | `JWT_EXPIRATION_MS` | `86400000` (24 h) | Vida del token |
-| `ADMIN_AUTO_CREATE` | `true` | Crea usuario admin inicial si no hay usuarios |
+| `ADMIN_AUTO_CREATE` | `true` | Crea usuarios admin+superadmin iniciales si no hay usuarios |
 | `ADMIN_USER` | `admin` | Usuario admin inicial |
 | `ADMIN_PASSWORD` | `admin123` | Contraseña admin inicial |
+| `SUPERADMIN_USER` | `gustavo` | Usuario superadmin inicial (único) |
+| `SUPERADMIN_PASSWORD` | `admin123` | Contraseña superadmin inicial |
 
 > Dev usa `ddl-auto: update` (Hibernate crea/actualiza el esquema). Crear la base antes de arrancar:
 >
@@ -74,12 +76,12 @@ Variables de entorno (con defaults para dev):
 > CREATE DATABASE bd_servicio_agua;
 > ```
 
-> **Seguridad:** todos los endpoints bajo `/api/**` exigen token JWT (`Authorization: Bearer <token>`), salvo `POST /api/auth/login`, Swagger (`/swagger-ui/**`, `/swagger-ui.html`) y OpenAPI (`/v3/api-docs/**`). Credenciales dev: `admin` / `admin123` (cambiar `ADMIN_PASSWORD` en producción y desactivar `ADMIN_AUTO_CREATE` si procede).
+> **Seguridad:** todos los endpoints bajo `/api/**` exigen token JWT (`Authorization: Bearer <token>`), salvo `POST /api/auth/login`, Swagger (`/swagger-ui/**`, `/swagger-ui.html`) y OpenAPI (`/v3/api-docs/**`). Credenciales dev: `admin` / `admin123` (ADMIN) y `gustavo` / `admin123` (SUPERADMIN, único; cambiar `ADMIN_PASSWORD`/`SUPERADMIN_PASSWORD` en producción y desactivar `ADMIN_AUTO_CREATE` si procede).
 
 ## Seguridad en producción
 
 - Autenticación **JWT stateless** (Spring Security 6): `POST /api/auth/login` devuelve `{ token, username, rol }`; el resto de `/api/*` requiere el token en `Authorization`.
-- Un único rol `ADMIN`; el usuario inicial se autocrea en arranque si `ADMIN_AUTO_CREATE=true` y no existen usuarios.
+- Roles: `ADMIN` (gestión general) y `SUPERADMIN` (único; además puede eliminar usuarios y cambiar rol/contraseña de otros). Los usuarios iniciales se autocrean en arranque si `ADMIN_AUTO_CREATE=true` y no existen usuarios; `@PreAuthorize("hasRole('SUPERADMIN')")` en `DELETE /api/usuarios/{id}` y `PUT /api/usuarios/{id}/rol` (denegación → 403).
 - Swagger UI / OpenAPI siguen accesibles sin autenticación (window de documentación o restringir por red/gateway en producción).
 - Desconocidos → 404 con `ApiResponse` uniforme (`NoHandlerFoundException` mapeado en `GlobalExceptionHandler`). Pérdida/ausencia de autenticación → 401 con `ApiResponse`.
 - Credenciales de BD y JWT solo por variables de entorno (nunca en el repositorio).

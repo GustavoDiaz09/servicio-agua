@@ -3,10 +3,14 @@ package com.servicioagua.common.config;
 import com.servicioagua.cliente.Cliente;
 import com.servicioagua.cliente.ClienteRepository;
 import com.servicioagua.common.enums.*;
+import com.servicioagua.factura.Factura;
+import com.servicioagua.factura.FacturaRepository;
 import com.servicioagua.lectura.Lectura;
 import com.servicioagua.lectura.LecturaRepository;
 import com.servicioagua.medidor.Medidor;
 import com.servicioagua.medidor.MedidorRepository;
+import com.servicioagua.pago.Pago;
+import com.servicioagua.pago.PagoRepository;
 import com.servicioagua.red.Sector;
 import com.servicioagua.red.SectorRepository;
 import com.servicioagua.tarifa.Tarifa;
@@ -20,8 +24,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -34,6 +41,8 @@ public class DataSeeder implements CommandLineRunner {
     private final TomaRepository tomaRepository;
     private final MedidorRepository medidorRepository;
     private final LecturaRepository lecturaRepository;
+    private final FacturaRepository facturaRepository;
+    private final PagoRepository pagoRepository;
 
     @Override
     @Transactional
@@ -76,16 +85,81 @@ public class DataSeeder implements CommandLineRunner {
         Medidor m4 = medidor("MTR-1004", toma4, hoy.minusMonths(14));
         Medidor m5 = medidor("MTR-1005", toma5, hoy.minusMonths(14));
 
-        lectura(m1, hoy.minusMonths(1), 120, 0);
-        lectura(m1, hoy, 150, 30);
-        lectura(m2, hoy.minusMonths(1), 90, 0);
-        lectura(m2, hoy, 108, 18);
-        lectura(m3, hoy.minusMonths(1), 250, 0);
-        lectura(m3, hoy, 320, 70);
-        lectura(m4, hoy.minusMonths(1), 60, 0);
-        lectura(m4, hoy, 74, 14);
-        lectura(m5, hoy.minusMonths(1), 400, 0);
-        lectura(m5, hoy, 470, 70);
+        Lectura l1Ant = lectura(m1, hoy.minusMonths(1), 120, 0);
+        Lectura l1Act = lectura(m1, hoy, 150, 30);
+        Lectura l2Ant = lectura(m2, hoy.minusMonths(1), 90, 0);
+        Lectura l2Act = lectura(m2, hoy, 108, 18);
+        Lectura l3Ant = lectura(m3, hoy.minusMonths(1), 250, 0);
+        Lectura l3Act = lectura(m3, hoy, 320, 70);
+        Lectura l4Ant = lectura(m4, hoy.minusMonths(1), 60, 0);
+        Lectura l4Act = lectura(m4, hoy, 74, 14);
+        Lectura l5Ant = lectura(m5, hoy.minusMonths(1), 400, 0);
+        Lectura l5Act = lectura(m5, hoy, 470, 70);
+
+        LocalDate periodoDesde = hoy.withDayOfMonth(1);
+        Factura fPerez = factura(perez, l1Act, 30, periodoDesde, hoy, hoy.plusDays(20), EstadoFactura.PENDIENTE);
+        Factura fGarcia = factura(garcia, l3Act, 70, periodoDesde, hoy, hoy.plusDays(12), EstadoFactura.PARCIAL);
+        pago(fGarcia, new BigDecimal("3000.00"), MetodoPago.EFECTIVO);
+        factura(lopez, l2Act, 18, periodoDesde, hoy, hoy.minusDays(5), EstadoFactura.VENCIDA);
+    }
+
+    private Factura factura(Cliente cliente, Lectura lectura, int consumo, LocalDate desde, LocalDate hasta,
+                            LocalDate vencimiento, EstadoFactura estado) {
+        BigDecimal cargoFijo = tarifaRepository.findAll().stream()
+                .filter(t -> t.getDesdeM3() == 0)
+                .map(Tarifa::getCargoFijo)
+                .filter(cargo -> cargo != null)
+                .findFirst()
+                .orElse(BigDecimal.ZERO);
+        BigDecimal subtotal = calcularSubtotal(consumo);
+        String numero = String.format("FAC-%d-%02d-%04d", desde.getYear(), desde.getMonthValue(),
+                facturaRepository.countByPeriodoDesde(desde) + 1);
+        return facturaRepository.save(Factura.builder()
+                .numero(numero)
+                .cliente(cliente)
+                .lectura(lectura)
+                .consumoM3(consumo)
+                .subtotal(subtotal)
+                .cargoFijo(cargoFijo)
+                .total(subtotal.add(cargoFijo))
+                .periodoDesde(desde)
+                .periodoHasta(hasta)
+                .vencimiento(vencimiento)
+                .estado(estado)
+                .build());
+    }
+
+    private BigDecimal calcularSubtotal(int consumoTotal) {
+        List<Tarifa> tramos = tarifaRepository.findAll().stream()
+                .sorted(Comparator.comparingInt(Tarifa::getDesdeM3))
+                .toList();
+        BigDecimal subtotal = BigDecimal.ZERO;
+        int restante = consumoTotal;
+        for (Tarifa tramo : tramos) {
+            if (restante <= 0) {
+                break;
+            }
+            int capacidad = tramo.getDesdeM3() == 0
+                    ? tramo.getHastaM3()
+                    : tramo.getHastaM3() - tramo.getDesdeM3() + 1;
+            int m3DelTramo = Math.min(restante, capacidad);
+            subtotal = subtotal.add(tramo.getPrecioPorM3().multiply(BigDecimal.valueOf(m3DelTramo)));
+            restante -= m3DelTramo;
+        }
+        if (restante > 0) {
+            BigDecimal precioTop = tramos.get(tramos.size() - 1).getPrecioPorM3();
+            subtotal = subtotal.add(precioTop.multiply(BigDecimal.valueOf(restante)));
+        }
+        return subtotal.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private void pago(Factura factura, BigDecimal monto, MetodoPago metodo) {
+        pagoRepository.save(Pago.builder()
+                .factura(factura)
+                .monto(monto)
+                .fechaPago(LocalDate.now())
+                .metodo(metodo)
+                .build());
     }
 
     private Sector sector(String nombre, String zona, String presion) {
@@ -142,8 +216,8 @@ public class DataSeeder implements CommandLineRunner {
                 .build());
     }
 
-    private void lectura(Medidor medidor, LocalDate fecha, int valor, int consumo) {
-        lecturaRepository.save(Lectura.builder()
+    private Lectura lectura(Medidor medidor, LocalDate fecha, int valor, int consumo) {
+        return lecturaRepository.save(Lectura.builder()
                 .medidor(medidor)
                 .valorLectura(valor)
                 .consumoM3(consumo)

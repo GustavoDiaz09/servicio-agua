@@ -2,6 +2,7 @@ package com.servicioagua.security;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.Optional;
 
 public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
@@ -10,5 +11,7 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     boolean existsByUsername(String username);
 
-    long countByRolAndEnabled(Rol rol, boolean enabled);
+    long countByRolInAndEnabled(Collection<Rol> roles, boolean enabled);
+
+    long countByRol(Rol rol);
 }

@@ -24,10 +24,10 @@ Arranque dev: requiere base PostgreSQL `bd_servicio_agua` ya creada; credenciale
 PostgreSQL **local** (este equipo): la instalación de Windows (`Program Files`) está rota/sin binarios; se usa un **cluster portable PG 17.11** en `%LOCALAPPDATA%\PostgreSQL\pgsql\bin` (datos en `%LOCALAPPDATA%\PostgreSQL\pgdata`, superuser `postgres`/`postgres`, puerto 5432). No es un servicio de Windows: arrancar con `pg_ctl -D <pgdata> -l <log> start` (o `pg_ctl stop`) antes/después de usar el backend. No "reparar" la instalación de `Program Files`.
 
 ```powershell
-.\mvnw.cmd spring-boot:run     # API en http://localhost:8080 (Swagger en /swagger-ui.html, sin auth de login: admin/admin123)
+.\mvnw.cmd spring-boot:run     # API en http://localhost:8080 (Swagger en /swagger-ui.html, sin auth de login: admin/admin123, gustavo/admin123)
 ```
 
-`DataSeeder` (`common/config/`) carga datos demo si `app.seed.enabled=true` (default): `.\mvnw.cmd spring-boot:run -Dspring-boot.run.arguments=--app.seed.enabled=false`.
+`DataSeeder` (`common/config/`) carga datos demo si `app.seed.enabled=true` (default): `.\mvnw.cmd spring-boot:run -Dspring-boot.run.arguments=--app.seed.enabled=false`. Incluye **3 facturas demo** (PENDIENTE/PARCIAL/VENCIDA) para que la página Pagos muestre la interfaz de cobro; el número se genera con `facturaRepository.countByPeriodoDesde(...) + 1`.
 
 **Dev rápido sin PostgreSQL** (H2 en memoria, mismo `application.yml` de tests vía classpath de test; datos no persistidos):
 
@@ -35,15 +35,17 @@ PostgreSQL **local** (este equipo): la instalación de Windows (`Program Files`)
 .\mvnw.cmd spring-boot:test-run   # API en http://localhost:8080 con datos demo
 ```
 
+> ⚠️ **Reinicios borran la sesión dev:** H2 en memoria crea los usuarios al arrancar (`AdminUserInitializer`) y pierde todo al reiniciar; si el navegador quedó con un token viejo, `client.js` responde a un 401 borrando el token y redirigiendo a `/login`. Tras reiniciar el backend, hacer logout/re-login.
+
 ## Seguridad (JWT)
 
 - Todos los `/api/**` exigen `Authorization: Bearer <token>` salvo `POST /api/auth/login`, Swagger (`/swagger-ui.html`, `/swagger-ui/**`) y OpenAPI (`/v3/api-docs/**`): `permitAll` en `SecurityConfig`.
-- `POST /api/auth/login` con `{ username, password }` → `{ token, username, rol }`. Un único rol `ADMIN`.
-- Usuario dev `admin`/`admin123` se autocrea al arrancar (`AdminUserInitializer`) si `app.security.admin-auto-create=true` y no existen usuarios.
-- Config por variables de entorno: `JWT_SECRET` (≥32 bytes, HS256), `JWT_EXPIRATION_MS`, `ADMIN_USER`, `ADMIN_PASSWORD`, `ADMIN_AUTO_CREATE` (defaults en `SecurityProperties`/`application.yml`; sin cambios el secreto expira en 24 h).
+- `POST /api/auth/login` con `{ username, password }` → `{ token, username, rol }`. Roles: `ADMIN` (gestión general) y `SUPERADMIN` (único, puede además eliminar usuarios, cambiar rol y contraseña de otros; acceso total). `@EnableMethodSecurity` + `@PreAuthorize("hasRole('SUPERADMIN')")` en los endpoints exclusivos; denegación sin permiso → **403** (`AccessDeniedException` mapeado en `GlobalExceptionHandler`).
+- Usuarios dev se autocrean al arrancar (`AdminUserInitializer`) si `app.security.admin-auto-create=true` y no existen usuarios: `admin`/`admin123` (ADMIN) y `gustavo`/`admin123` (SUPERADMIN).
+- Config por variables de entorno: `JWT_SECRET` (≥32 bytes, HS256), `JWT_EXPIRATION_MS`, `ADMIN_AUTO_CREATE`, `ADMIN_USER`, `ADMIN_PASSWORD`, `SUPERADMIN_USER`, `SUPERADMIN_PASSWORD` (defaults en `SecurityProperties`/`application.yml`; sin cambios el secreto expira en 24 h).
 - Sin token/token inválido → 401 con `ApiResponse` JSON uniforme (entry-point en `SecurityConfig`; `AuthenticationException` → 401 también mapeado en `GlobalExceptionHandler`). Rutas inexistentes siguen → 404.
 - Swagger UI incluye botón **Authorize** (esquema `bearerAuth` en `OpenApiConfig`): pegar el token para probar endpoints protegidos con "Try it out".
-- Gestión de usuarios en `/api/usuarios` (listar/crear/estado/reset clave, rol único `ADMIN`) y `PUT /api/auth/change-password` para cambiar la propia clave. Guardas anti-lockout en `UsuarioService` (no deshabilitarse a sí mismo, no deshabilitar al único admin habilitado → 409). Al probar reglas de usuarios en tests, fijar `app.security.admin-auto-create=false`.
+- Gestión de usuarios en `/api/usuarios` (listar/crear/estado/reset clave; `DELETE /{id}` y `PUT /{id}/rol` solo SUPERADMIN) y `PUT /api/auth/change-password` para cambiar la propia clave. Guardas anti-lockout en `UsuarioService` (no gestionarse a sí mismo, no deshabilitar al último admin habilitado, solo un SUPERADMIN posible, no quitar el rol al único superadministrador → 409). Al probar reglas de usuarios en tests, fijar `app.security.admin-auto-create=false`.
 
 ## Frontend (fuera del build Maven)
 
@@ -109,3 +111,12 @@ Cada agente trabaja **solo** dentro de su paquete. Un método nuevo en el reposi
 **Gotcha: aluvión de "cannot find symbol" por Lombok.** Con `clean compile`, cualquier error **real** de javac en un archivo (p. ej. método duplicado, typo) hace que se descarte la generación de Lombok para toda la compilación → lluvia de `cannot find symbol` de getters/setters/`builder()` por casi todos los módulos (`cliente`, `factura`, `lectura`, …). NO son errores reales: los getters existen (Lombok `@Data`). Hay que buscar el **primer** error que no sea de Lombok (suele estar en el archivo que se está editando) y, al arreglarlo, la lluvia desaparece sola.
 
 - No modificar `common/`, entidades, repos ni otros paquetes sin autorización.
+
+## Pendiente — página Pagos (ciclo 7, 2026-09-23)
+
+**Sin cerrar.** El usuario reporta que `/pagos` se muestra en blanco ("solo el fondo, sin menú") en el navegador tras los reinicios del backend. Estado verificado a nivel de backend/proxy (TODO funciona):
+- API devuelve 3 facturas demo por `GET /api/facturas/estado/PENDIENTE|PARCIAL|VENCIDA` (vía proxy 5173→8080) con token válido.
+- Permisos 403/409 de SUPERADMIN funcionando; `mvnw -q compile`, `npm run build` y 119 tests verdes.
+- `client.js` borra el token y redirige a `/login` ante cualquier 401 (sesiones H2 no sobreviven reinicios).
+
+Causa probable en el navegador: sesión/token viejo y un Vite que llevaba horas corriendo (se reinició en limpio, PID 4472). **Pendiente para mañana:** confirmar en el navegador (Ctrl+Shift+R, re-login como `admin` o `gustavo`) y, si sigue en blanco, revisar consola de DevTools; no reconfirmado por el usuario a nivel de UI.

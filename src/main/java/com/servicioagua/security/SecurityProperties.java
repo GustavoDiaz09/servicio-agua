@@ -18,4 +18,8 @@ public class SecurityProperties {
     private String adminUsername = "admin";
 
     private String adminPassword = "admin123";
+
+    private String superadminUsername = "gustavo";
+
+    private String superadminPassword = "admin123";
 }

@@ -30,5 +30,11 @@ public class AdminUserInitializer implements ApplicationRunner {
                 .rol(Rol.ADMIN)
                 .enabled(true)
                 .build());
+        usuarioRepository.save(Usuario.builder()
+                .username(properties.getSuperadminUsername())
+                .password(passwordEncoder.encode(properties.getSuperadminPassword()))
+                .rol(Rol.SUPERADMIN)
+                .enabled(true)
+                .build());
     }
 }

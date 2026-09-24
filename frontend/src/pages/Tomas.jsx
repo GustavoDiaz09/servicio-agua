@@ -91,7 +91,7 @@ export default function Tomas() {
 
   function abrirEstado(t) {
     setEstadoTarget(t)
-    setNuevoEstado(t.estado)
+    setNuevoEstado(t.estado === 'ACTIVA' ? 'SUSPENDIDA' : 'ACTIVA')
     setEstadoError('')
     setEstadoOpen(true)
   }

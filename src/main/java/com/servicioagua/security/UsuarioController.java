@@ -1,6 +1,7 @@
 package com.servicioagua.security;
 
 import com.servicioagua.common.dto.ApiResponse;
+import com.servicioagua.security.dto.CambiarRolRequest;
 import com.servicioagua.security.dto.CrearUsuarioRequest;
 import com.servicioagua.security.dto.EstadoUsuarioRequest;
 import com.servicioagua.security.dto.ResetPasswordRequest;
@@ -9,6 +10,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -49,5 +52,20 @@ public class UsuarioController {
             @PathVariable Long id, @Valid @RequestBody ResetPasswordRequest request) {
         usuarioService.resetPassword(id, request);
         return ResponseEntity.ok(ApiResponse.ok("Contraseña actualizada correctamente", null));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('SUPERADMIN')")
+    public ResponseEntity<ApiResponse<Void>> eliminar(@PathVariable Long id) {
+        usuarioService.eliminar(id);
+        return ResponseEntity.ok(ApiResponse.ok("Usuario eliminado correctamente", null));
+    }
+
+    @PutMapping("/{id}/rol")
+    @PreAuthorize("hasRole('SUPERADMIN')")
+    public ResponseEntity<ApiResponse<UsuarioDto>> cambiarRol(
+            @PathVariable Long id, @Valid @RequestBody CambiarRolRequest request) {
+        return ResponseEntity.ok(ApiResponse.ok("Rol del usuario actualizado correctamente",
+                usuarioService.cambiarRol(id, request)));
     }
 }
