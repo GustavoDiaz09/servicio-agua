@@ -7,11 +7,14 @@ services:
     runtime: docker
     plan: free
     dockerfilePath: ./Dockerfile
-    healthCheckPath: /swagger-ui.html
+    healthCheckPath: /api/health
     envVars:
       # Puerto expuesto por Render (el app lee ${PORT})
       - key: PORT
         value: 10000
+      # Swagger/OpenAPI no públicos en producción
+      - key: PUBLIC_DOCS
+        value: "false"
       # --- Supabase (session pooler, IPv4). El host directo db.<ref> es IPv6-only ---
       # DB_URL: jdbc:postgresql://aws-0-us-east-2.pooler.supabase.com:5432/postgres?sslmode=require&prepareThreshold=0
       - key: DB_URL

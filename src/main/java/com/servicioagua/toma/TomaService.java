@@ -3,13 +3,10 @@ package com.servicioagua.toma;
 import com.servicioagua.cliente.Cliente;
 import com.servicioagua.cliente.ClienteRepository;
 import com.servicioagua.common.enums.EstadoToma;
-import com.servicioagua.common.enums.EstadoLectura;
 import com.servicioagua.common.exception.BusinessException;
 import com.servicioagua.common.exception.DuplicateResourceException;
 import com.servicioagua.common.exception.ResourceNotFoundException;
-import com.servicioagua.factura.FacturaRepository;
-import com.servicioagua.lectura.LecturaRepository;
-import com.servicioagua.medidor.MedidorRepository;
+import com.servicioagua.lectura.LecturaPendienteService;
 import com.servicioagua.red.Sector;
 import com.servicioagua.red.SectorRepository;
 import com.servicioagua.toma.dto.TomaEstadoRequest;
@@ -30,9 +27,7 @@ public class TomaService {
     private final TomaRepository tomaRepository;
     private final SectorRepository sectorRepository;
     private final ClienteRepository clienteRepository;
-    private final MedidorRepository medidorRepository;
-    private final LecturaRepository lecturaRepository;
-    private final FacturaRepository facturaRepository;
+    private final LecturaPendienteService lecturaPendienteService;
 
     @Transactional
     public TomaResponse crear(TomaRequest request) {
@@ -135,13 +130,7 @@ public class TomaService {
     }
 
     private void validarSinLecturasPendientes(Toma toma) {
-        LocalDate corte = facturaRepository.maxPeriodoHastaNoAnulada(toma.getCliente().getId());
-        boolean tienePendientes = medidorRepository.findByTomaId(toma.getId()).stream()
-                .anyMatch(medidor -> corte == null
-                        ? lecturaRepository.existsByMedidorIdAndEstado(medidor.getId(), EstadoLectura.ACTIVA)
-                        : lecturaRepository.existsByMedidorIdAndEstadoAndFechaLecturaGreaterThan(
-                                medidor.getId(), EstadoLectura.ACTIVA, corte));
-        if (tienePendientes) {
+        if (lecturaPendienteService.tienePendientesDeToma(toma.getId(), toma.getCliente().getId())) {
             throw new BusinessException("No se puede dar de baja la toma: tiene lecturas pendientes de facturar");
         }
     }

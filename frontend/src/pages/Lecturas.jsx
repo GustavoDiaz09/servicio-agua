@@ -57,8 +57,8 @@ export default function Lecturas() {
   useEffect(() => {
     api
       .get('/medidores')
-      .then(setMedidores)
-      .catch(() => {})
+      .then((data) => setMedidores(data || []))
+      .catch((e) => setError('No se pudo cargar la lista de medidores: ' + e.message))
   }, [])
 
   useEffect(() => {

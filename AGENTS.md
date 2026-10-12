@@ -25,7 +25,7 @@ Maven **no** está en el PATH global. Usar siempre el wrapper:
 PostgreSQL **local** (este equipo): la instalación de Windows (`Program Files`) está rota/sin binarios; se usa un **cluster portable PG 17.11** en `%LOCALAPPDATA%\PostgreSQL\pgsql\bin` (datos en `%LOCALAPPDATA%\PostgreSQL\pgdata`, superuser `postgres`/`postgres`, puerto 5432). No es un servicio de Windows: arrancar con `pg_ctl -D <pgdata> -l <log> start` (o `pg_ctl stop`) antes/después de usar el backend. No "reparar" la instalación de `Program Files`.
 
 ```powershell
-.\mvnw.cmd spring-boot:run     # API en http://localhost:8080 (Swagger en /swagger-ui.html, sin auth; login: admin/admin123, gustavo/admin123)
+.\mvnw.cmd spring-boot:run     # API en http://localhost:8080 (Swagger en /swagger-ui.html; admin/gustavo toman ADMIN_PASSWORD/SUPERADMIN_PASSWORD o, si no se definen, una clave aleatoria que se imprime con WARN)
 ```
 
 `DataSeeder` (`common/config/`) carga datos demo si `app.seed.enabled=true` (default): `.\mvnw.cmd spring-boot:run -Dspring-boot.run.arguments=--app.seed.enabled=false`. Incluye **3 facturas demo** (PENDIENTE/PARCIAL/VENCIDA) para la página Pagos; su número se genera con `facturaRepository.countByPeriodoDesde(...) + 1`.
@@ -40,13 +40,13 @@ PostgreSQL **local** (este equipo): la instalación de Windows (`Program Files`)
 
 ## Seguridad (JWT)
 
-- Todos los `/api/**` exigen `Authorization: Bearer <token>` salvo `POST /api/auth/login`, Swagger (`/swagger-ui.html`, `/swagger-ui/**`) y OpenAPI (`/v3/api-docs/**`): `permitAll` en `SecurityConfig`.
-- `POST /api/auth/login` con `{ username, password }` → `{ token, username, rol }`. Roles: `ADMIN` (gestión general) y `SUPERADMIN` (único; además puede eliminar usuarios, cambiar rol y contraseña de otros). `@EnableMethodSecurity` + `@PreAuthorize("hasRole('SUPERADMIN')")` en los endpoints exclusivos; denegación sin permiso → **403** (`AccessDeniedException` mapeado en `GlobalExceptionHandler`).
-- Usuarios dev se autocrean al arrancar (`AdminUserInitializer`) si `app.security.admin-auto-create=true` y no existen usuarios: `admin`/`admin123` (ADMIN) y `gustavo`/`admin123` (SUPERADMIN).
-- Config por variables de entorno: `JWT_SECRET` (≥32 bytes, HS256), `JWT_EXPIRATION_MS`, `ADMIN_AUTO_CREATE`, `ADMIN_USER`, `ADMIN_PASSWORD`, `SUPERADMIN_USER`, `SUPERADMIN_PASSWORD` (defaults en `SecurityProperties`/`application.yml`; sin cambios el secreto expira en 24 h).
+- Todos los `/api/**` exigen `Authorization: Bearer <token>` salvo `POST /api/auth/login`, `GET /api/health`, Swagger (`/swagger-ui.html`, `/swagger-ui/**`) y OpenAPI (`/v3/api-docs/**`): `permitAll` en `SecurityConfig`. Swagger solo es público si `app.security.public-docs=true` (default; en producción `PUBLIC_DOCS=false`).
+- `POST /api/auth/login` con `{ username, password }` → `{ token, username, rol }`. Roles: `ADMIN` (gestión general) y `SUPERADMIN` (único; además puede eliminar usuarios, cambiar rol y contraseña de otros). `@EnableMethodSecurity` + `@PreAuthorize("hasRole('SUPERADMIN')")` en los endpoints exclusivos; denegación sin permiso → **403** (`AccessDeniedException` mapeado en `GlobalExceptionHandler`). Rate-limit: 5 fallos por usuario en 15 min → **429** (`LoginAttemptService`).
+- Usuarios dev se autocrean al arrancar (`AdminUserInitializer`) si `app.security.admin-auto-create=true` y no existen usuarios: `admin` (ADMIN) y `gustavo` (SUPERADMIN). **No hay contraseña por defecto**: si `ADMIN_PASSWORD`/`SUPERADMIN_PASSWORD` están vacíos se genera una aleatoria y se imprime como WARN (en tests/H2 `test-run` el `application.yml` de tests fija `admin123`).
+- Config por variables de entorno: `JWT_SECRET` (≥32 bytes, HS256), `JWT_EXPIRATION_MS`, `ADMIN_AUTO_CREATE`, `ADMIN_USER`, `ADMIN_PASSWORD`, `SUPERADMIN_USER`, `SUPERADMIN_PASSWORD`. **Sin `JWT_SECRET` no hay default**: `JwtService` genera una clave aleatoria de sesión (WARN) y los tokens se invalidan al reiniciar (fijar el secreto en producción).
 - Sin token/token inválido → 401 con `ApiResponse` JSON uniforme (entry-point en `SecurityConfig`; `AuthenticationException` → 401 también mapeado en `GlobalExceptionHandler`). Rutas inexistentes → 404.
 - Swagger UI incluye botón **Authorize** (esquema `bearerAuth` en `OpenApiConfig`): pegar el token para probar endpoints protegidos con "Try it out".
-- Gestión de usuarios en `/api/usuarios` (listar/crear/estado/reset clave; `DELETE /{id}` y `PUT /{id}/rol` solo SUPERADMIN) y `PUT /api/auth/change-password` para cambiar la propia clave. Guardas anti-lockout en `UsuarioService` (no gestionarse a sí mismo, no deshabilitar al último admin habilitado, solo un SUPERADMIN posible, no quitar el rol al único superadministrador → 409). Al probar reglas de usuarios en tests, fijar `app.security.admin-auto-create=false`.
+- Gestión de usuarios en `/api/usuarios` (listar/crear/estado/reset clave; `DELETE /{id}` y `PUT /{id}/rol` solo SUPERADMIN) y `PUT /api/auth/change-password` para cambiar la propia clave. Guardas anti-lockout en `UsuarioService` (no gestionarse a sí mismo, no deshabilitar al último admin habilitado, solo un SUPERADMIN posible, no quitar el rol al único superadministrador → 409) y guarda de jerarquía (un `ADMIN` no puede gestionar/resetear/deshabilitar a un `SUPERADMIN` → 403). Al probar reglas de usuarios en tests, fijar `app.security.admin-auto-create=false`.
 
 ## Frontend (fuera del build Maven)
 
@@ -79,7 +79,7 @@ PostgreSQL **local** (este equipo): la instalación de Windows (`Program Files`)
 
 ## Tests
 
-- `src/test/java/com/servicioagua/<modulo>/*ApiTests.java`: `@SpringBootTest` + `MockMvc` + H2 (`MODE=PostgreSQL`) + `@Transactional`. No requieren PostgreSQL. Actualmente **121 tests**.
+- `src/test/java/com/servicioagua/<modulo>/*ApiTests.java`: `@SpringBootTest` + `MockMvc` + H2 (`MODE=PostgreSQL`) + `@Transactional`. No requieren PostgreSQL. Actualmente **125 tests**.
 - Los tests de módulo usan `@AutoConfigureMockMvc(addFilters = false)` para **desactivar el filtro JWT** (no envían token). Solo `SecurityApiTests`/`UsuarioApiTests` ejercitan auth real.
 - La mayoría desactiva el seed con `@SpringBootTest(properties = "app.seed.enabled=false")` y arma sus propios datos; `src/test/resources/application.yml` lo deja activo por defecto.
 - Al cambiar reglas de negocio: actualizar/ampliar el `*ApiTests` del módulo.

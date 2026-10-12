@@ -19,3 +19,7 @@ app:
     enabled: true
   cors:
     allowed-origins: http://localhost:5173
+  security:
+    jwt-secret: servicio-agua-test-secret-hs256-minimo-32-bytes-abcdef0123456789
+    admin-password: admin123
+    superadmin-password: admin123

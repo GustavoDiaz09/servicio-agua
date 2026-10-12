@@ -102,3 +102,23 @@ Método: lectura de código + 3 exploraciones (seguridad, backend, frontend) + s
 - **3 hallazgos ALTA** (todos en `security/`): reset de contraseña sin control de rol, secreto JWT por defecto y credenciales por defecto.
 - **12 MEDIA** (seguridad, negocio y frontend) y una lista de **BAJA** de limpieza/deuda técnica.
 - Ninguno bloquea el go-live actual; se recomienda priorizar #1 (escalada de privilegios) seguido de #6 y #8.
+
+## 5. Remediación (ciclo 8.1)
+
+- **ALTA 1-3 y MEDIA 4-15 corregidos** en el código; `.\mvnw.cmd -q test` → **125 tests verdes** (121 previos + 4 nuevos) y `npm run build` OK.
+- **1 (ALTA)** — `UsuarioService.validarGestionSegura` ahora bloquea a un `ADMIN` que gestione/resetee/deshabilite a un `SUPERADMIN` (`AccessDeniedException` → 403); se invoca también en `resetPassword` y `cambiarEstado`; `UsuarioController` con `@PreAuthorize("hasAnyRole('ADMIN','SUPERADMIN')")`. Tests: `adminNoPuedeResetearPasswordDeSuperadminDevuelve403`, `adminNoPuedeDeshabilitarSuperadminDevuelve403`.
+- **2 (ALTA)** — sin default de `JWT_SECRET` (`SecurityProperties`/`application.yml` vacíos); `JwtService` genera clave aleatoria de sesión + WARN si falta.
+- **3 (ALTA)** — sin contraseñas por defecto; `AdminUserInitializer` genera una aleatoria de 16 chars + WARN si `ADMIN_PASSWORD`/`SUPERADMIN_PASSWORD` están vacías. El `application.yml` de tests fija `admin123` (H2/`test-run`).
+- **4 (MEDIA)** — cubierto por la guarda de jerarquía de 1.
+- **5 (MEDIA)** — Swagger/OpenAPI tras `app.security.public-docs` (default `true`; `PUBLIC_DOCS=false` en `render.yaml`); nuevo `GET /api/health` público y `healthCheckPath` apunta ahí.
+- **6 (MEDIA)** — `WebConfig` expone `CorsConfigurationSource`; `SecurityConfig` usa `.cors(...)` + `accessDeniedHandler` (403 uniforme).
+- **7 (MEDIA)** — `LoginAttemptService` (5 fallos/usuario/15 min) → `RateLimitException` → 429. Test: `demasiadosIntentosFallidosDevuelve429`.
+- **8 (MEDIA)** — `SectorService.delete` valida también `FugaRepository`/`MantenimientoRepository` → 409.
+- **9 (MEDIA)** — `DataIntegrityViolationException` → 409 en `GlobalExceptionHandler`.
+- **10 (MEDIA)** — mitigado por 9 (la carrera sigue, pero ya no devuelve 500; el `while existsByNumero` + handler cubren la colisión).
+- **11 (MEDIA)** — nueva `TarifaCalculadora` (tarifa) usada por `FacturaService` y `DataSeeder`; nuevo `LecturaPendienteService` (lectura) usado por `TomaService` y `MedidorService`.
+- **12 (MEDIA)** — `@Slf4j` + `log.error` en `handleGeneric` y `log.warn` en el handler de integridad.
+- **13 (MEDIA)** — CI `node-version: 22` + `engines.node >=22` en `frontend/package.json`.
+- **14 (MEDIA)** — `client.js` → `return payload?.data ?? null`.
+- **15 (MEDIA)** — feedback de error en los fetches de medidores/clientes/tomas (`Lecturas.jsx`, `Facturas.jsx`, `Medidores.jsx`).
+- **Bajas:** siguen abiertas (limpieza/deuda); no bloquean el go-live.

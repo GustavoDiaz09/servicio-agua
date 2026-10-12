@@ -1,13 +1,11 @@
 package com.servicioagua.medidor;
 
-import com.servicioagua.common.enums.EstadoLectura;
 import com.servicioagua.common.enums.EstadoMedidor;
 import com.servicioagua.common.enums.EstadoToma;
 import com.servicioagua.common.exception.BusinessException;
 import com.servicioagua.common.exception.DuplicateResourceException;
 import com.servicioagua.common.exception.ResourceNotFoundException;
-import com.servicioagua.factura.FacturaRepository;
-import com.servicioagua.lectura.LecturaRepository;
+import com.servicioagua.lectura.LecturaPendienteService;
 import com.servicioagua.medidor.dto.MedidorAsignacionRequest;
 import com.servicioagua.medidor.dto.MedidorEstadoRequest;
 import com.servicioagua.medidor.dto.MedidorRequest;
@@ -28,8 +26,7 @@ public class MedidorService {
 
     private final MedidorRepository medidorRepository;
     private final TomaRepository tomaRepository;
-    private final LecturaRepository lecturaRepository;
-    private final FacturaRepository facturaRepository;
+    private final LecturaPendienteService lecturaPendienteService;
 
     @Transactional
     public MedidorResponse crear(MedidorRequest request) {
@@ -107,15 +104,9 @@ public class MedidorService {
             throw new BusinessException("El medidor ya está retirado");
         }
         Toma toma = medidor.getToma();
-        if (toma != null) {
-            LocalDate corte = facturaRepository.maxPeriodoHastaNoAnulada(toma.getCliente().getId());
-            boolean tienePendientes = corte == null
-                    ? lecturaRepository.existsByMedidorIdAndEstado(medidor.getId(), EstadoLectura.ACTIVA)
-                    : lecturaRepository.existsByMedidorIdAndEstadoAndFechaLecturaGreaterThan(
-                            medidor.getId(), EstadoLectura.ACTIVA, corte);
-            if (tienePendientes) {
-                throw new BusinessException("No se puede retirar el medidor: tiene lecturas sin facturar");
-            }
+        if (toma != null
+                && lecturaPendienteService.tienePendientesDeMedidor(medidor.getId(), toma.getCliente().getId())) {
+            throw new BusinessException("No se puede retirar el medidor: tiene lecturas sin facturar");
         }
         medidor.setEstado(EstadoMedidor.RETIRADO);
         medidor.setToma(null);

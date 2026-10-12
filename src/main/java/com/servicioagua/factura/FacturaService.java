@@ -13,6 +13,7 @@ import com.servicioagua.lectura.LecturaRepository;
 import com.servicioagua.medidor.Medidor;
 import com.servicioagua.medidor.MedidorRepository;
 import com.servicioagua.tarifa.Tarifa;
+import com.servicioagua.tarifa.TarifaCalculadora;
 import com.servicioagua.tarifa.TarifaRepository;
 import com.servicioagua.toma.Toma;
 import com.servicioagua.toma.TomaRepository;
@@ -21,7 +22,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -30,14 +30,13 @@ import java.util.List;
 @RequiredArgsConstructor
 public class FacturaService {
 
-    private static final int CENTAVOS = 2;
-
     private final FacturaRepository facturaRepository;
     private final ClienteRepository clienteRepository;
     private final TomaRepository tomaRepository;
     private final MedidorRepository medidorRepository;
     private final LecturaRepository lecturaRepository;
     private final TarifaRepository tarifaRepository;
+    private final TarifaCalculadora tarifaCalculadora;
 
     @Transactional
     public FacturaResponse generar(GenerarFacturaRequest request) {
@@ -61,13 +60,8 @@ public class FacturaService {
         }
 
         List<Tarifa> tramos = buscarTramosVigentes(request);
-        BigDecimal subtotal = calcularSubtotal(consumoTotal, tramos);
-        BigDecimal cargoFijo = tramos.stream()
-                .filter(t -> t.getDesdeM3() == 0)
-                .map(Tarifa::getCargoFijo)
-                .map(cargo -> cargo != null ? cargo : BigDecimal.ZERO)
-                .findFirst()
-                .orElse(BigDecimal.ZERO);
+        BigDecimal subtotal = tarifaCalculadora.calcularSubtotal(consumoTotal, tramos);
+        BigDecimal cargoFijo = tarifaCalculadora.cargoFijo(tramos);
 
         Factura factura = Factura.builder()
                 .numero(generarNumero(request.getPeriodoDesde()))
@@ -168,30 +162,6 @@ public class FacturaService {
             throw new BusinessException("No hay tarifas vigentes para el período indicado");
         }
         return tramos;
-    }
-
-    private BigDecimal calcularSubtotal(int consumoTotal, List<Tarifa> tramos) {
-        BigDecimal subtotal = BigDecimal.ZERO;
-        int restante = consumoTotal;
-        for (Tarifa tramo : tramos) {
-            if (restante <= 0) {
-                break;
-            }
-            int capacidad;
-            if (tramo.getDesdeM3() == 0) {
-                capacidad = tramo.getHastaM3();
-            } else {
-                capacidad = tramo.getHastaM3() - tramo.getDesdeM3() + 1;
-            }
-            int m3DelTramo = Math.min(restante, capacidad);
-            subtotal = subtotal.add(tramo.getPrecioPorM3().multiply(BigDecimal.valueOf(m3DelTramo)));
-            restante -= m3DelTramo;
-        }
-        if (restante > 0) {
-            BigDecimal precioTop = tramos.get(tramos.size() - 1).getPrecioPorM3();
-            subtotal = subtotal.add(precioTop.multiply(BigDecimal.valueOf(restante)));
-        }
-        return subtotal.setScale(CENTAVOS, RoundingMode.HALF_UP);
     }
 
     private String generarNumero(LocalDate periodoDesde) {

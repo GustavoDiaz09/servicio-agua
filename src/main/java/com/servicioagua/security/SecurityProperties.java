@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "app.security")
 public class SecurityProperties {
 
-    private String jwtSecret = "servicio-agua-d3v-2026-clave-jwt-hs256-minimo-32-bytes-abcdef0123456789";
+    private String jwtSecret;
 
     private long jwtExpirationMs = 86_400_000;
 
@@ -17,9 +17,9 @@ public class SecurityProperties {
 
     private String adminUsername = "admin";
 
-    private String adminPassword = "admin123";
+    private String adminPassword;
 
     private String superadminUsername = "gustavo";
 
-    private String superadminPassword = "admin123";
+    private String superadminPassword;
 }

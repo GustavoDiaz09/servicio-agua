@@ -62,13 +62,13 @@ Variables de entorno (con defaults para dev):
 | `DB_USER` | `postgres` | Usuario |
 | `DB_PASSWORD` | `postgres` | Contraseña |
 | `CORS_ORIGINS` | `http://localhost:5173,...` | Orígenes permitidos |
-| `JWT_SECRET` | clave dev (≥32 bytes) | Secreto HS256 para firmar tokens |
+| `JWT_SECRET` | (vacío) | Secreto HS256 para firmar tokens; si se omite se genera una clave de sesión aleatoria (los tokens se invalidan al reiniciar) |
 | `JWT_EXPIRATION_MS` | `86400000` (24 h) | Vida del token |
 | `ADMIN_AUTO_CREATE` | `true` | Crea usuarios admin+superadmin iniciales si no hay usuarios |
 | `ADMIN_USER` | `admin` | Usuario admin inicial |
-| `ADMIN_PASSWORD` | `admin123` | Contraseña admin inicial |
+| `ADMIN_PASSWORD` | (vacío) | Contraseña admin inicial; si se omite se genera una aleatoria (WARN en logs) |
 | `SUPERADMIN_USER` | `gustavo` | Usuario superadmin inicial (único) |
-| `SUPERADMIN_PASSWORD` | `admin123` | Contraseña superadmin inicial |
+| `SUPERADMIN_PASSWORD` | (vacío) | Contraseña superadmin inicial; si se omite se genera una aleatoria (WARN en logs) |
 
 > Dev usa `ddl-auto: update` (Hibernate crea/actualiza el esquema). Crear la base antes de arrancar:
 >
@@ -76,13 +76,13 @@ Variables de entorno (con defaults para dev):
 > CREATE DATABASE bd_servicio_agua;
 > ```
 
-> **Seguridad:** todos los endpoints bajo `/api/**` exigen token JWT (`Authorization: Bearer <token>`), salvo `POST /api/auth/login`, Swagger (`/swagger-ui/**`, `/swagger-ui.html`) y OpenAPI (`/v3/api-docs/**`). Credenciales dev: `admin` / `admin123` (ADMIN) y `gustavo` / `admin123` (SUPERADMIN, único; cambiar `ADMIN_PASSWORD`/`SUPERADMIN_PASSWORD` en producción y desactivar `ADMIN_AUTO_CREATE` si procede).
+> **Seguridad:** todos los endpoints bajo `/api/**` exigen token JWT (`Authorization: Bearer <token>`), salvo `POST /api/auth/login`, `GET /api/health`, Swagger (`/swagger-ui/**`, `/swagger-ui.html`, solo si `app.security.public-docs=true`) y OpenAPI (`/v3/api-docs/**`). En arranque se crean `admin` (ADMIN) y `gustavo` (SUPERADMIN); **no hay contraseñas por defecto**: definir `ADMIN_PASSWORD`/`SUPERADMIN_PASSWORD` o copiar la clave aleatoria que se imprime con WARN en los logs. Login limitado a 5 intentos fallidos por usuario cada 15 min (429).
 
 ## Seguridad en producción
 
 - Autenticación **JWT stateless** (Spring Security 6): `POST /api/auth/login` devuelve `{ token, username, rol }`; el resto de `/api/*` requiere el token en `Authorization`.
 - Roles: `ADMIN` (gestión general) y `SUPERADMIN` (único; además puede eliminar usuarios y cambiar rol/contraseña de otros). Los usuarios iniciales se autocrean en arranque si `ADMIN_AUTO_CREATE=true` y no existen usuarios; `@PreAuthorize("hasRole('SUPERADMIN')")` en `DELETE /api/usuarios/{id}` y `PUT /api/usuarios/{id}/rol` (denegación → 403).
-- Swagger UI / OpenAPI siguen accesibles sin autenticación (window de documentación o restringir por red/gateway en producción).
+- Swagger UI / OpenAPI solo son públicos si `app.security.public-docs=true` (default). En producción definir `PUBLIC_DOCS=false` para dejarlos detrás del JWT; `GET /api/health` sigue siendo público para healthchecks.
 - Desconocidos → 404 con `ApiResponse` uniforme (`NoHandlerFoundException` mapeado en `GlobalExceptionHandler`). Pérdida/ausencia de autenticación → 401 con `ApiResponse`.
 - Credenciales de BD y JWT solo por variables de entorno (nunca en el repositorio).
 

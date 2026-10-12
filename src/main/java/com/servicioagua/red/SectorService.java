@@ -19,6 +19,8 @@ public class SectorService {
     private final SectorRepository sectorRepository;
     private final TuberiaRepository tuberiaRepository;
     private final TomaRepository tomaRepository;
+    private final FugaRepository fugaRepository;
+    private final MantenimientoRepository mantenimientoRepository;
 
     @Transactional
     public SectorResponse create(SectorRequest request) {
@@ -60,7 +62,9 @@ public class SectorService {
     public void delete(Long id) {
         Sector sector = getSector(id);
         if (!tuberiaRepository.findBySectorId(id).isEmpty()
-                || !tomaRepository.findBySectorId(id).isEmpty()) {
+                || !tomaRepository.findBySectorId(id).isEmpty()
+                || !fugaRepository.findBySectorId(id).isEmpty()
+                || !mantenimientoRepository.findBySectorId(id).isEmpty()) {
             throw new BusinessException("El sector tiene elementos asociados");
         }
         sectorRepository.delete(sector);

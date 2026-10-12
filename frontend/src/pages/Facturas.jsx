@@ -110,8 +110,8 @@ export default function Facturas() {
 
   useEffect(() => {
     api.get('/clientes')
-      .then(setClientes)
-      .catch(() => {})
+      .then((data) => setClientes(data || []))
+      .catch((e) => setListError('No se pudieron cargar los clientes: ' + e.message))
   }, [])
 
   function abrirDetalle(factura) {

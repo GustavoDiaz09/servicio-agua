@@ -9,6 +9,8 @@ import com.servicioagua.security.dto.EstadoUsuarioRequest;
 import com.servicioagua.security.dto.ResetPasswordRequest;
 import com.servicioagua.security.dto.UsuarioDto;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -45,8 +47,8 @@ public class UsuarioService {
     @Transactional
     public UsuarioDto cambiarEstado(Long id, EstadoUsuarioRequest request) {
         Usuario usuario = obtener(id);
+        String usuarioActual = SecurityContextHolder.getContext().getAuthentication().getName();
         if (!Boolean.TRUE.equals(request.getEnabled()) && usuario.isEnabled()) {
-            String usuarioActual = SecurityContextHolder.getContext().getAuthentication().getName();
             if (usuario.getUsername().equals(usuarioActual)) {
                 throw new BusinessException("No puede deshabilitarse a sí mismo");
             }
@@ -54,6 +56,7 @@ public class UsuarioService {
                 throw new BusinessException("No puede deshabilitar al último administrador habilitado");
             }
         }
+        validarGestionSegura(usuario);
         usuario.setEnabled(Boolean.TRUE.equals(request.getEnabled()));
         return UsuarioDto.from(usuarioRepository.save(usuario));
     }
@@ -61,6 +64,7 @@ public class UsuarioService {
     @Transactional
     public void resetPassword(Long id, ResetPasswordRequest request) {
         Usuario usuario = obtener(id);
+        validarGestionSegura(usuario);
         usuario.setPassword(passwordEncoder.encode(request.getNewPassword()));
         usuarioRepository.save(usuario);
     }
@@ -99,9 +103,14 @@ public class UsuarioService {
     }
 
     private void validarGestionSegura(Usuario usuario) {
-        String usuarioActual = SecurityContextHolder.getContext().getAuthentication().getName();
-        if (usuario.getUsername().equals(usuarioActual)) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (usuario.getUsername().equals(authentication.getName())) {
             throw new BusinessException("No puede gestionar su propio usuario");
+        }
+        boolean esSuperadmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_" + Rol.SUPERADMIN.name()));
+        if (usuario.getRol() == Rol.SUPERADMIN && !esSuperadmin) {
+            throw new AccessDeniedException("Un administrador no puede gestionar a un superadministrador");
         }
     }
 

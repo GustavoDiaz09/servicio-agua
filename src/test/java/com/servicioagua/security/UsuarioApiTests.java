@@ -387,4 +387,37 @@ class UsuarioApiTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
     }
+
+    @Test
+    void adminNoPuedeDeshabilitarSuperadminDevuelve403() throws Exception {
+        crearRol("root", "clave1234", Rol.SUPERADMIN);
+        crear("ana", "clave1234");
+        mockMvc.perform(put("/api/usuarios/{id}/estado", idDe("root"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(estadoBody(false)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void adminNoPuedeResetearPasswordDeSuperadminDevuelve403() throws Exception {
+        crearRol("root", "clave1234", Rol.SUPERADMIN);
+        mockMvc.perform(put("/api/usuarios/{id}/password", idDe("root"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(resetBody("reseteada9")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void superadminPuedeResetearPasswordDeOtroSuperadmin() throws Exception {
+        autenticarComoSuperadmin("venus");
+        crearRol("venus", "clave1234", Rol.SUPERADMIN);
+        crearRol("root", "clave1234", Rol.SUPERADMIN);
+        mockMvc.perform(put("/api/usuarios/{id}/password", idDe("root"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(resetBody("reseteada9")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
 }

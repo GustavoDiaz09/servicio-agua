@@ -82,8 +82,9 @@ export default function Medidores() {
   async function cargarTomas() {
     try {
       setTomas(await api.get('/tomas') || [])
-    } catch {
+    } catch (e) {
       setTomas([])
+      setAsignarError('No se pudieron cargar las tomas: ' + e.message)
     }
   }
 

@@ -36,7 +36,7 @@ async function request(path, { method = 'GET', body } = {}) {
     throw new Error(message)
   }
 
-  return payload?.data ?? payload
+  return payload?.data ?? null
 }
 
 export const api = {

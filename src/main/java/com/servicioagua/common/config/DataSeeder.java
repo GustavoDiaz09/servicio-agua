@@ -14,6 +14,7 @@ import com.servicioagua.pago.PagoRepository;
 import com.servicioagua.red.Sector;
 import com.servicioagua.red.SectorRepository;
 import com.servicioagua.tarifa.Tarifa;
+import com.servicioagua.tarifa.TarifaCalculadora;
 import com.servicioagua.tarifa.TarifaRepository;
 import com.servicioagua.toma.Toma;
 import com.servicioagua.toma.TomaRepository;
@@ -24,10 +25,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Comparator;
 import java.util.List;
 
 @Component
@@ -37,6 +36,7 @@ public class DataSeeder implements CommandLineRunner {
 
     private final SectorRepository sectorRepository;
     private final TarifaRepository tarifaRepository;
+    private final TarifaCalculadora tarifaCalculadora;
     private final ClienteRepository clienteRepository;
     private final TomaRepository tomaRepository;
     private final MedidorRepository medidorRepository;
@@ -105,13 +105,9 @@ public class DataSeeder implements CommandLineRunner {
 
     private Factura factura(Cliente cliente, Lectura lectura, int consumo, LocalDate desde, LocalDate hasta,
                             LocalDate vencimiento, EstadoFactura estado) {
-        BigDecimal cargoFijo = tarifaRepository.findAll().stream()
-                .filter(t -> t.getDesdeM3() == 0)
-                .map(Tarifa::getCargoFijo)
-                .filter(cargo -> cargo != null)
-                .findFirst()
-                .orElse(BigDecimal.ZERO);
-        BigDecimal subtotal = calcularSubtotal(consumo);
+        List<Tarifa> tramos = tarifaRepository.findAll();
+        BigDecimal cargoFijo = tarifaCalculadora.cargoFijo(tramos);
+        BigDecimal subtotal = tarifaCalculadora.calcularSubtotal(consumo, tramos);
         String numero = String.format("FAC-%d-%02d-%04d", desde.getYear(), desde.getMonthValue(),
                 facturaRepository.countByPeriodoDesde(desde) + 1);
         return facturaRepository.save(Factura.builder()
@@ -127,30 +123,6 @@ public class DataSeeder implements CommandLineRunner {
                 .vencimiento(vencimiento)
                 .estado(estado)
                 .build());
-    }
-
-    private BigDecimal calcularSubtotal(int consumoTotal) {
-        List<Tarifa> tramos = tarifaRepository.findAll().stream()
-                .sorted(Comparator.comparingInt(Tarifa::getDesdeM3))
-                .toList();
-        BigDecimal subtotal = BigDecimal.ZERO;
-        int restante = consumoTotal;
-        for (Tarifa tramo : tramos) {
-            if (restante <= 0) {
-                break;
-            }
-            int capacidad = tramo.getDesdeM3() == 0
-                    ? tramo.getHastaM3()
-                    : tramo.getHastaM3() - tramo.getDesdeM3() + 1;
-            int m3DelTramo = Math.min(restante, capacidad);
-            subtotal = subtotal.add(tramo.getPrecioPorM3().multiply(BigDecimal.valueOf(m3DelTramo)));
-            restante -= m3DelTramo;
-        }
-        if (restante > 0) {
-            BigDecimal precioTop = tramos.get(tramos.size() - 1).getPrecioPorM3();
-            subtotal = subtotal.add(precioTop.multiply(BigDecimal.valueOf(restante)));
-        }
-        return subtotal.setScale(2, RoundingMode.HALF_UP);
     }
 
     private void pago(Factura factura, BigDecimal monto, MetodoPago metodo) {
