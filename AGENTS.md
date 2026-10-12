@@ -79,7 +79,7 @@ PostgreSQL **local** (este equipo): la instalación de Windows (`Program Files`)
 
 ## Tests
 
-- `src/test/java/com/servicioagua/<modulo>/*ApiTests.java`: `@SpringBootTest` + `MockMvc` + H2 (`MODE=PostgreSQL`) + `@Transactional`. No requieren PostgreSQL. Actualmente **119 tests**.
+- `src/test/java/com/servicioagua/<modulo>/*ApiTests.java`: `@SpringBootTest` + `MockMvc` + H2 (`MODE=PostgreSQL`) + `@Transactional`. No requieren PostgreSQL. Actualmente **121 tests**.
 - Los tests de módulo usan `@AutoConfigureMockMvc(addFilters = false)` para **desactivar el filtro JWT** (no envían token). Solo `SecurityApiTests`/`UsuarioApiTests` ejercitan auth real.
 - La mayoría desactiva el seed con `@SpringBootTest(properties = "app.seed.enabled=false")` y arma sus propios datos; `src/test/resources/application.yml` lo deja activo por defecto.
 - Al cambiar reglas de negocio: actualizar/ampliar el `*ApiTests` del módulo.
