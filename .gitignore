@@ -27,3 +27,6 @@ Thumbs.db
 .env.*
 .vercel
 .env*
+
+# Auditorias locales (salidas de scripts/audit-security.ps1)
+docs/audit/

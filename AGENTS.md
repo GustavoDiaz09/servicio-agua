@@ -2,6 +2,12 @@
 
 Guía para agentes que trabajen en el **Sistema de Gestión de Agua Potable**.
 
+> **OBLIGATORIO al iniciar la sesión.** Apenas leas este archivo y antes de cualquier otra tarea, ejecuta la auditoría de seguridad y reporta el veredicto:
+> ```
+> powershell -ExecutionPolicy Bypass -File scripts\audit-security.ps1
+> ```
+> Si el veredicto no es `OK` o el exit code ≠ 0, **reporta los FAIL al usuario y no continúes** con la tarea pedida hasta resolverlos o recibir instrucciones. La corrida incluye los tests de seguridad (puede tardar ~1-2 min). Detalles en "Auditoría de seguridad programada".
+
 ## Stack y arquitectura
 
 - Java 17 · Spring Boot 3.3.5 · Spring Web · Spring Data JPA · Spring Security + JWT (jjwt) · PostgreSQL · Maven (wrapper).
@@ -84,6 +90,14 @@ PostgreSQL **local** (este equipo): la instalación de Windows (`Program Files`)
 - La mayoría desactiva el seed con `@SpringBootTest(properties = "app.seed.enabled=false")` y arma sus propios datos; `src/test/resources/application.yml` lo deja activo por defecto.
 - Al cambiar reglas de negocio: actualizar/ampliar el `*ApiTests` del módulo.
 - CI (`.github/workflows/ci.yml`) corre `./mvnw -B -ntp clean package` (+ frontend `npm ci`/`npm run build`) en `main`/PRs: el proyecto entero debe compilar y pasar tests, no solo el módulo tocado.
+
+## Auditoría de seguridad programada
+
+- **Al iniciar cada sesión**: correr la auditoría completa (directiva al inicio de este archivo) y reportar el veredicto (`OK`/`REVISAR`) antes de continuar.
+- `scripts/audit-security.ps1` corre una **auditoría local de seguridad/auth**: valida invariantes por código (JWT sin default, sin credenciales por defecto, Swagger gateado por `app.security.public-docs`, CORS + `accessDeniedHandler`, `RateLimitException`→429, `AccessDeniedException`→403, `AuthenticationException`→401, `@PreAuthorize` en usuarios, guardas de jerarquía ADMIN/SUPERADMIN, `.env` no versionado) y ejecuta `SecurityApiTests` + `UsuarioApiTests`. Genera informe Markdown en `docs/audit/security-audit-<fecha>.md` (+ `latest.md`) y devuelve exit ≠ 0 si algo falla.
+- Uso manual: `powershell -ExecutionPolicy Bypass -File scripts\audit-security.ps1` (agregar `-SkipTests` para solo checks estáticos). `docs/audit/` está gitignored (son salidas locales).
+- Tarea de Windows: `scripts/register-audit-task.ps1` registra/actualiza `ServicioAgua-SecurityAudit` (semanal, lunes 09:00; usar `-Schedule Daily -At HH:mm` para cambiarlo). Correr ahora: `Start-ScheduledTask -TaskName 'ServicioAgua-SecurityAudit'`; quitar: `Unregister-ScheduledTask -TaskName 'ServicioAgua-SecurityAudit' -Confirm:$false`. La tarea corre solo con el usuario logueado (LogonType Interactive).
+- Al agregar un control de seguridad nuevo, sumar su check al script para que la auditoría programada lo cubra.
 
 ## Gotchas de módulo ya cerrados (no romper)
 
