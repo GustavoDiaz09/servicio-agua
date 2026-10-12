@@ -3,7 +3,7 @@
 # La base de datos es Supabase (ver variables DB_*). No usa Postgres gestionado de Render.
 services:
   - type: web
-    name: servicio-agua-backend
+    name: servicio-agua-backend-45jr
     runtime: docker
     plan: free
     dockerfilePath: ./Dockerfile
