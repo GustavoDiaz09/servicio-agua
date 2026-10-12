@@ -94,6 +94,12 @@ PostgreSQL **local** (este equipo): la instalación de Windows (`Program Files`)
 
 **Gotcha: aluvión de "cannot find symbol" por Lombok.** Con `clean compile`, cualquier error **real** de javac en un archivo (p. ej. método duplicado, typo) hace que se descarte la generación de Lombok para toda la compilación → lluvia de `cannot find symbol` de getters/setters/`builder()` por casi todos los módulos. NO son errores reales: los getters existen (Lombok `@Data`). Buscar el **primer** error que no sea de Lombok (suele estar en el archivo que se está editando); al arreglarlo, la lluvia desaparece sola.
 
+## Base de datos (Supabase)
+
+- Producción es **Supabase** (Postgres); credenciales en `.env` (gitignored, no commitear). El backend usa el *session pooler* IPv4 (`aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require&prepareThreshold=0`): el host directo `db.<project_ref>.supabase.co` resuelve **solo IPv6** y no enruta desde esta máquina.
+- El esquema lo genera Hibernate (`ddl-auto: update`), así que **RLS no vive en el código**: en cada base nueva ejecutar `docs/supabase-rls.sql` para habilitar RLS en `public` (sin policies → PostgREST/anon bloqueado). El rol `postgres` tiene `BYPASSRLS`, por lo que el backend no se afecta. Esto resuelve los advisories `rls_disabled_in_public` y `sensitive_columns_exposed`.
+- El proyecto de producción pertenece a una cuenta distinta a la del MCP de opencode (ese apunta a otro proyecto): no usar el MCP para escribir aquí; conectar por `psql`/JDBC con las credenciales de `.env`.
+
 ## Criterios de "hecho"
 
 - `.\mvnw.cmd -q compile` sin errores desde la raíz.
